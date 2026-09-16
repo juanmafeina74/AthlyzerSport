@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
+import { CategoriasModule } from './categorias/categorias.module.js';
 import { EquiposModule } from './equipos/equipos.module.js';
 import { JugadoresModule } from './jugadores/jugadores.module.js';
 import { TemporadasModule } from './temporadas/temporadas.module.js';
@@ -15,6 +16,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
       isGlobal: true,
     }),
     AuthModule,
+    CategoriasModule,
     EquiposModule,
     JugadoresModule,
     TemporadasModule,

@@ -7,12 +7,16 @@ export class EquiposService {
 
   async findAll() {
     return this.prisma.equipo.findMany({
+      include: { categoria: true },
       orderBy: { id_equipo: 'asc' },
     });
   }
 
   async findOne(id: number) {
-    const equipo = await this.prisma.equipo.findUnique({ where: { id_equipo: id } });
+    const equipo = await this.prisma.equipo.findUnique({
+      where: { id_equipo: id },
+      include: { categoria: true },
+    });
     if (!equipo) {
       throw new NotFoundException(`Equipo ${id} no encontrado`);
     }
@@ -21,6 +25,7 @@ export class EquiposService {
 
   async create(data: any) {
     const requestedTemporada = data.id_temporada ? Number(data.id_temporada) : undefined;
+    const requestedCategoria = data.id_categoria ? Number(data.id_categoria) : undefined;
 
     if (!requestedTemporada) {
       throw new BadRequestException(
@@ -38,11 +43,21 @@ export class EquiposService {
       );
     }
 
+    if (requestedCategoria) {
+      const categoria = await this.prisma.categoria.findFirst({
+        where: { id_categoria: requestedCategoria, activo: true },
+      });
+
+      if (!categoria) {
+        throw new BadRequestException('La categoría seleccionada no existe o está inactiva.');
+      }
+    }
+
     return this.prisma.equipo.create({
       data: {
         id_temporada: requestedTemporada,
         nombre: data.nombre,
-        categoria: data.categoria ?? null,
+        id_categoria: requestedCategoria ?? null,
         fecha_creacion: data.fecha_creacion
           ? new Date(data.fecha_creacion)
           : new Date(),
@@ -53,16 +68,40 @@ export class EquiposService {
   async update(id: number, data: any) {
     await this.findOne(id);
 
+    const updateData: any = {};
+
+    if (data.id_temporada !== undefined) {
+      updateData.id_temporada = Number(data.id_temporada);
+    }
+
+    if (data.nombre !== undefined) {
+      updateData.nombre = data.nombre;
+    }
+
+    if (data.id_categoria !== undefined) {
+      const requestedCategoria = data.id_categoria ? Number(data.id_categoria) : null;
+
+      if (requestedCategoria) {
+        const categoria = await this.prisma.categoria.findFirst({
+          where: { id_categoria: requestedCategoria, activo: true },
+        });
+
+        if (!categoria) {
+          throw new BadRequestException('La categoría seleccionada no existe o está inactiva.');
+        }
+      }
+
+      updateData.id_categoria = requestedCategoria;
+    }
+
+    if (data.fecha_creacion !== undefined) {
+      updateData.fecha_creacion = new Date(data.fecha_creacion);
+    }
+
     return this.prisma.equipo.update({
       where: { id_equipo: id },
-      data: {
-        id_temporada: data.id_temporada ?? undefined,
-        nombre: data.nombre,
-        categoria: data.categoria ?? null,
-        fecha_creacion: data.fecha_creacion
-          ? new Date(data.fecha_creacion)
-          : undefined,
-      },
+      data: updateData,
+      include: { categoria: true },
     });
   }
 

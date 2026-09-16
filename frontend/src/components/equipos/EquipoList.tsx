@@ -23,7 +23,7 @@ export default function EquipoList() {
           <div key={eq.id_equipo} className="flex flex-col gap-4 rounded-lg border border-panel-border bg-white p-4 shadow-soft md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold text-gray-900">{eq.nombre}</p>
-              {eq.categoria && <p className="text-sm text-gray-600">Categoría: {eq.categoria}</p>}
+              {eq.categoria && <p className="text-sm text-gray-600">Categoría: {eq.categoria.nombre}</p>}
             </div>
 
             <div className="flex gap-3">

@@ -26,13 +26,22 @@ model usuario {
 model equipo {
   id_equipo      Int              @id @default(autoincrement())
   id_temporada   Int
+  id_categoria   Int?
   nombre         String           @db.VarChar(100)
-  categoria      String?          @db.VarChar(50)
   fecha_creacion DateTime         @db.Date
   temporada      temporada        @relation(fields: [id_temporada], references: [id_temporada], onDelete: Cascade)
+  categoria      categoria?       @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict)
   jugador_equipo jugador_equipo[]
 
+  @@index([id_categoria], map: "idx_equipo_categoria")
   @@index([id_temporada], map: "idx_equipo_temporada")
+}
+
+model categoria {
+  id_categoria Int      @id @default(autoincrement())
+  nombre       String   @unique @db.VarChar(50)
+  activo       Boolean  @default(true)
+  equipos      equipo[]
 }
 
 model jugador {

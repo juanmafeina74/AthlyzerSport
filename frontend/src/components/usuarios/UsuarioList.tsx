@@ -32,17 +32,19 @@ export default function UsuarioList() {
         {usuarios.map((usuario) => (
           <div key={usuario.id_usuario} className="flex flex-col gap-4 rounded-lg border border-panel-border bg-white p-4 shadow-soft md:flex-row md:items-center md:justify-between">
             <div className="space-y-1">
-              <p className="font-semibold text-gray-900">{usuario.nombre}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-gray-900">{usuario.nombre}</p>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${roleStyles[usuario.role]}`}>
+                  {roleLabels[usuario.role]}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${usuario.activo ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                  {usuario.activo ? "Activo" : "Inactivo"}
+                </span>
+              </div>
               <p className="text-sm text-gray-600">{usuario.email}</p>
             </div>
 
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
-              <span className={`rounded-full px-3 py-1 text-sm font-medium ${roleStyles[usuario.role]}`}>
-                {roleLabels[usuario.role]}
-              </span>
-              <span className={`rounded-full px-3 py-1 text-sm font-medium ${usuario.activo ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                {usuario.activo ? "Activo" : "Inactivo"}
-              </span>
               <div className="flex gap-3">
                 <LinkButton color="light" to={`/usuarios/editar/${usuario.id_usuario}`}>Editar</LinkButton>
                 <LinkButton color="danger" to={`/usuarios/borrar/${usuario.id_usuario}`}>Borrar</LinkButton>

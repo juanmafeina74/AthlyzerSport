@@ -4,7 +4,7 @@ Documentacion de estado del proyecto a fecha 2026-09-15. El objetivo de este doc
 
 ## Resumen Ejecutivo
 
-AthLyzer Sports Train es una aplicacion web con backend NestJS y frontend React + Vite para gestionar informacion deportiva: usuarios, roles, equipos, jugadores y temporadas.
+AthLyzer Sports Train es una aplicacion web con backend NestJS y frontend React + Vite para gestionar informacion deportiva: usuarios, roles, categorías, equipos, jugadores y temporadas.
 
 Estado actual:
 
@@ -14,6 +14,7 @@ Estado actual:
 - Autorizacion backend con `JwtAuthGuard`, decorador `@Roles(...)` y `RolesGuard`.
 - Rutas CRUD protegidas por token; las mutaciones estan restringidas a rol `admin`.
 - Gestion CRUD de usuarios restringida a administradores.
+- Gestion CRUD de categorías deportivas y relación de cada equipo con una categoría.
 - Frontend con rutas privadas: si no hay usuario logado con token, redirige a `/login`.
 - UI unificada alrededor de componentes `Card`, `Button`, `LinkButton`, `FormInput`, `FormSelect` y `FormTextarea`.
 
@@ -164,6 +165,7 @@ backend/src/
 	main.ts                         # Bootstrap Nest, prefijo /api, CORS, seed auth
 	app.module.ts                   # Modulo raiz
 	auth/                           # Login, JWT, roles y seed de usuarios demo
+	categorias/                     # CRUD de categorías deportivas
 	common/global-exception.filter.ts
 	prisma/prisma.service.ts
 	equipos/                        # CRUD equipos
@@ -282,6 +284,13 @@ Endpoints principales:
 ```text
 POST   /api/auth/login
 
+GET    /api/categorias          admin
+GET    /api/categorias/activas  admin
+GET    /api/categorias/:id      admin
+POST   /api/categorias          admin
+PUT    /api/categorias/:id      admin
+DELETE /api/categorias/:id      admin
+
 GET    /api/usuarios          admin
 GET    /api/usuarios/roles    admin
 GET    /api/usuarios/:id      admin
@@ -321,8 +330,9 @@ Modelos definidos actualmente:
 
 - `rol`: roles de usuario.
 - `usuario`: usuarios con email, hash de password, rol y estado activo.
+- `categoria`: categorías deportivas con identificador, nombre único y estado activo.
 - `temporada`: temporadas deportivas.
-- `equipo`: equipos asociados a una temporada.
+- `equipo`: equipos asociados a una temporada y, opcionalmente, a una categoría mediante `id_categoria`.
 - `jugador`: jugadores con DNI, nombre, apellidos, fecha de nacimiento y foto.
 - `jugador_equipo`: relacion jugador-equipo con fechas, dorsal y estado activo.
 - `lesion`: lesiones de jugadores.
@@ -336,6 +346,7 @@ backend/prisma/migrations/
 	20260910140914_init/
 	20260910141245_init/
 	20260914110403_auth_roles_users/
+	20260916090000_categorias_equipos/
 ```
 
 ## Frontend
@@ -398,6 +409,10 @@ Rutas actuales:
 /
 /dashboard
 /admin
+/categorias
+/categorias/crear
+/categorias/editar/:id
+/categorias/borrar/:id
 /usuarios
 /usuarios/crear
 /usuarios/editar/:id
@@ -421,6 +436,7 @@ Rutas actuales:
 Los servicios estan en `frontend/src/components/services/`.
 
 - `auth.service.ts`: login, tipo `AuthUser` y helper `authHeaders()`.
+- `categorias.service.ts`: llamadas a `/api/categorias` y `/api/categorias/activas`.
 - `usuarios.service.ts`: llamadas a `/api/usuarios` y `/api/usuarios/roles`.
 - `equipos.service.ts`: llamadas a `/api/equipos`.
 - `jugadores.service.ts`: llamadas a `/api/jugadores`.
@@ -457,6 +473,7 @@ Pantallas ya alineadas con este sistema:
 - Login.
 - Dashboard.
 - Administracion.
+- Listar, crear, editar y borrar categorías.
 - Listar, crear, editar y borrar usuarios.
 - Listas de equipos, jugadores y temporadas.
 - Crear, editar y borrar equipos.
@@ -511,6 +528,20 @@ Operaciones disponibles:
 - Editar usuario con nombre, email, rol y estado.
 - Cambiar password desde edicion solo si se informa una nueva password.
 - Eliminar usuario.
+
+## Gestion de Categorías
+
+La gestión de categorías está disponible en el menú lateral para administradores, entre `Equipos` y `Jugadores`.
+
+Cada categoría tiene:
+
+- `id_categoria`: identificador autogenerado.
+- `nombre`: nombre único de categoría.
+- `activo`: estado activo o inactivo.
+
+El listado muestra el ID, nombre y una etiqueta de estado verde claro para categorías activas o rojo claro para inactivas.
+
+Las categorías activas se cargan en el selector de categoría al crear o editar un equipo. La categoría es opcional para un equipo. No es posible eliminar una categoría que esté asignada a uno o más equipos; primero debe reasignarse o quitarse de esos equipos.
 
 Aviso no bloqueante observado: Vitest muestra una recomendacion relacionada con `vite-tsconfig-paths`, indicando que Vite ya soporta resolucion nativa de paths mediante `resolve.tsconfigPaths`.
 

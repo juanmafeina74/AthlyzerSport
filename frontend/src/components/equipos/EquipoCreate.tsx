@@ -4,33 +4,29 @@ import Card from "../ui/card";
 import FormInput from "../ui/FormInput";
 import FormSelect from "../ui/FormSelect";
 import Button from "../ui/button";
+import categoriasService, { Categoria } from "../services/categorias.service";
 import equiposService from "../services/equipos.service";
 import temporadasService from "../services/temporadas.service";
 
 export default function EquipoCreate() {
   const navigate = useNavigate();
   const [temporadas, setTemporadas] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     nombre: "",
-    categoria: "",
+    id_categoria: "",
     fecha_creacion: "",
     id_temporada: "",
   });
 
   useEffect(() => {
     temporadasService.getAll().then((items) => setTemporadas(items));
+    categoriasService.getActive().then(setCategorias);
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm({ ...form, [e.target.name]: e.target.value });
-
-  const categorias = [
-    { value: "U12", label: "U12" },
-    { value: "U14", label: "U14" },
-    { value: "U16", label: "U16" },
-    { value: "Senior", label: "Senior" },
-  ];
 
   const handleSubmit = async () => {
     if (!form.id_temporada) {
@@ -62,10 +58,16 @@ export default function EquipoCreate() {
 
         <FormSelect
           label="Categoría"
-          name="categoria"
-          value={form.categoria}
+          name="id_categoria"
+          value={form.id_categoria}
           onChange={handleChange}
-          options={categorias}
+          options={[
+            { value: "", label: "Sin categoría" },
+            ...categorias.map((categoria) => ({
+              value: String(categoria.id_categoria),
+              label: categoria.nombre,
+            })),
+          ]}
         />
 
         <FormInput

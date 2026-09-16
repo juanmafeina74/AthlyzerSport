@@ -2,6 +2,10 @@ import { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import LoginPage from "./components/auth/LoginPage";
+import CategoriaCreate from "./components/categorias/CategoriaCreate";
+import CategoriaDelete from "./components/categorias/CategoriaDelete";
+import CategoriaEdit from "./components/categorias/CategoriaEdit";
+import CategoriaList from "./components/categorias/CategoriaList";
 import EquipoList from "./components/equipos/EquipoList";
 import EquipoCreate from "./components/equipos/EquipoCreate";
 import EquipoEdit from "./components/equipos/EquipoEdit";
@@ -73,6 +77,10 @@ export default function Router() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+        <Route path="/categorias" element={<RequireAdmin><CategoriaList /></RequireAdmin>} />
+        <Route path="/categorias/crear" element={<RequireAdmin><CategoriaCreate /></RequireAdmin>} />
+        <Route path="/categorias/editar/:id" element={<RequireAdmin><CategoriaEdit /></RequireAdmin>} />
+        <Route path="/categorias/borrar/:id" element={<RequireAdmin><CategoriaDelete /></RequireAdmin>} />
         <Route path="/usuarios" element={<RequireAdmin><UsuarioList /></RequireAdmin>} />
         <Route path="/usuarios/crear" element={<RequireAdmin><UsuarioCreate /></RequireAdmin>} />
         <Route path="/usuarios/editar/:id" element={<RequireAdmin><UsuarioEdit /></RequireAdmin>} />

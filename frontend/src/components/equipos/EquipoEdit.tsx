@@ -1,22 +1,28 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import categoriasService, { Categoria } from "../services/categorias.service";
 import equiposService from "../services/equipos.service";
 import Button from "../ui/button";
 import Card from "../ui/card";
 import FormInput from "../ui/FormInput";
+import FormSelect from "../ui/FormSelect";
 
 export default function EquipoEdit() {
   const navigate = useNavigate();
   const { id } = useParams();
   const equipoId = Number(id);
-  const [nombre, setNombre] = useState("");
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [form, setForm] = useState({ nombre: "", id_categoria: "" });
 
   useEffect(() => {
-    equiposService.getById(equipoId).then((eq) => setNombre(eq.nombre));
+    categoriasService.getActive().then(setCategorias);
+    equiposService.getById(equipoId).then((eq) => {
+      setForm({ nombre: eq.nombre, id_categoria: String(eq.id_categoria ?? "") });
+    });
   }, []);
 
   const handleSubmit = async () => {
-    await equiposService.update(equipoId, { nombre });
+    await equiposService.update(equipoId, form);
     navigate("/equipos");
   };
 
@@ -26,9 +32,22 @@ export default function EquipoEdit() {
         <FormInput
           label="Nombre del equipo"
           name="nombre"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
+          value={form.nombre}
+          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
           required
+        />
+        <FormSelect
+          label="Categoría"
+          name="id_categoria"
+          value={form.id_categoria}
+          onChange={(e) => setForm({ ...form, id_categoria: e.target.value })}
+          options={[
+            { value: "", label: "Sin categoría" },
+            ...categorias.map((categoria) => ({
+              value: String(categoria.id_categoria),
+              label: categoria.nombre,
+            })),
+          ]}
         />
       </div>
 
