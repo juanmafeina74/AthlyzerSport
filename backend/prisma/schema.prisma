@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model rol {
+  id_rol   Int      @id @default(autoincrement())
+  nombre   String   @unique @db.VarChar(50)
+  usuarios usuario[]
+}
+
+model usuario {
+  id_usuario   Int      @id @default(autoincrement())
+  nombre       String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(150)
+  password_hash String  @db.VarChar(255)
+  id_rol       Int
+  activo       Boolean  @default(true)
+  rol          rol      @relation(fields: [id_rol], references: [id_rol])
+}
+
+model equipo {
+  id_equipo      Int              @id @default(autoincrement())
+  id_temporada   Int
+  nombre         String           @db.VarChar(100)
+  categoria      String?          @db.VarChar(50)
+  fecha_creacion DateTime         @db.Date
+  temporada      temporada        @relation(fields: [id_temporada], references: [id_temporada], onDelete: Cascade)
+  jugador_equipo jugador_equipo[]
+
+  @@index([id_temporada], map: "idx_equipo_temporada")
+}
+
+model jugador {
+  id_jugador              Int                       @id @default(autoincrement())
+  dni                     String                    @unique @db.VarChar(20)
+  nombre                  String                    @db.VarChar(100)
+  apellidos               String                    @db.VarChar(150)
+  fecha_nacimiento        DateTime                  @db.Date
+  foto                    String?
+  jugador_equipo          jugador_equipo[]
+  lesion                  lesion[]
+  medicion_antropometrica medicion_antropometrica[]
+
+  @@index([nombre, apellidos], map: "idx_jugador_nombre")
+}
+
+model jugador_equipo {
+  id_jugador_equipo Int       @id @default(autoincrement())
+  id_jugador        Int
+  id_equipo         Int
+  fecha_inicio      DateTime  @db.Date
+  fecha_fin         DateTime? @db.Date
+  dorsal            Int?
+  activo            Boolean   @default(true)
+  equipo            equipo    @relation(fields: [id_equipo], references: [id_equipo], onDelete: Cascade)
+  jugador           jugador   @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
+
+  @@index([activo], map: "idx_jugador_equipo_activo")
+  @@index([id_equipo], map: "idx_jugador_equipo_equipo")
+  @@index([id_jugador], map: "idx_jugador_equipo_jugador")
+}
+
+model lesion {
+  id_lesion     Int       @id @default(autoincrement())
+  id_jugador    Int
+  fecha_inicio  DateTime  @db.Date
+  fecha_fin     DateTime? @db.Date
+  tipo_lesion   String?   @db.VarChar(100)
+  zona_corporal String?   @db.VarChar(100)
+  gravedad      String?   @db.VarChar(50)
+  alta_medica   Boolean   @default(false)
+  observaciones String?
+  jugador       jugador   @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
+
+  @@index([id_jugador], map: "idx_lesion_jugador")
+  @@index([tipo_lesion], map: "idx_lesion_tipo")
+}
+
+model medicion_antropometrica {
+  id_medicion    Int      @id @default(autoincrement())
+  id_jugador     Int
+  fecha_medicion DateTime @db.Date
+  peso           Decimal? @db.Decimal(5, 2)
+  altura         Decimal? @db.Decimal(5, 2)
+  grasa_corporal Decimal? @db.Decimal(5, 2)
+  masa_muscular  Decimal? @db.Decimal(5, 2)
+  observaciones  String?
+  jugador        jugador  @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
+
+  @@index([fecha_medicion], map: "idx_medicion_fecha")
+  @@index([id_jugador], map: "idx_medicion_jugador")
+}
+
+model posicion {
+  id_posicion Int     @id @default(autoincrement())
+  nombre      String  @db.VarChar(100)
+  abreviatura String? @db.VarChar(10)
+}
+
+model temporada {
+  id_temporada Int      @id @default(autoincrement())
+  nombre       String   @db.VarChar(100)
+  fecha_inicio DateTime @db.Date
+  fecha_fin    DateTime @db.Date
+  estado       String   @db.VarChar(50)
+  equipo       equipo[]
+
+  @@index([estado], map: "idx_temporada_estado")
+}
