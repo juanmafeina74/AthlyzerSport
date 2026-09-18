@@ -12,6 +12,7 @@ export default function EquipoEdit() {
   const { id } = useParams();
   const equipoId = Number(id);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ nombre: "", id_categoria: "" });
 
   useEffect(() => {
@@ -22,8 +23,16 @@ export default function EquipoEdit() {
   }, []);
 
   const handleSubmit = async () => {
-    await equiposService.update(equipoId, form);
-    navigate("/equipos");
+    setError("");
+    const response = await equiposService.update(equipoId, form);
+
+    if (response.ok) {
+      navigate("/equipos");
+      return;
+    }
+
+    const body = await response.json().catch(() => ({ message: "No se pudo actualizar el equipo." }));
+    setError(body.message ?? body.error ?? "No se pudo actualizar el equipo.");
   };
 
   return (
@@ -50,6 +59,8 @@ export default function EquipoEdit() {
           ]}
         />
       </div>
+
+      {error && <p className="rounded-lg bg-alert-danger px-4 py-3 text-sm text-red-800">{error}</p>}
 
       <div className="flex gap-3">
         <Button color="light" onClick={() => navigate(-1)}>Volver</Button>

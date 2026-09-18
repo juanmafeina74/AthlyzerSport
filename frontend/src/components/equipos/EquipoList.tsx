@@ -27,6 +27,7 @@ export default function EquipoList() {
             </div>
 
             <div className="flex gap-3">
+              <LinkButton color="blue" to={`/equipos/plantilla/${eq.id_equipo}`}>Plantilla</LinkButton>
               <LinkButton color="light" to={`/equipos/editar/${eq.id_equipo}`}>Editar</LinkButton>
               <LinkButton color="danger" to={`/equipos/borrar/${eq.id_equipo}`}>Borrar</LinkButton>
             </div>

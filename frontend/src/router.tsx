@@ -10,6 +10,7 @@ import EquipoList from "./components/equipos/EquipoList";
 import EquipoCreate from "./components/equipos/EquipoCreate";
 import EquipoEdit from "./components/equipos/EquipoEdit";
 import EquipoDelete from "./components/equipos/EquipoDelete";
+import EquipoPlantilla from "./components/equipos/EquipoPlantilla";
 import JugadorDelete from "./components/jugadores/JugadorDelete";
 import JugadorList from "./components/jugadores/JugadorList";
 import JugadorEdit from "./components/jugadores/JugadorEdit";
@@ -89,6 +90,7 @@ export default function Router() {
         <Route path="/equipos/crear" element={<RequireAuth><EquipoCreate /></RequireAuth>} />
         <Route path="/equipos/editar/:id" element={<RequireAuth><EquipoEdit /></RequireAuth>} />
         <Route path="/equipos/borrar/:id" element={<RequireAuth><EquipoDelete /></RequireAuth>} />
+        <Route path="/equipos/plantilla/:id" element={<RequireAuth><EquipoPlantilla /></RequireAuth>} />
         <Route path="/jugadores" element={<RequireAuth><JugadorList /></RequireAuth>} />
         <Route path="/jugadores/crear" element={<RequireAuth><JugadorCreate /></RequireAuth>} />
         <Route path="/jugadores/editar/:id" element={<RequireAuth><JugadorEdit /></RequireAuth>} />

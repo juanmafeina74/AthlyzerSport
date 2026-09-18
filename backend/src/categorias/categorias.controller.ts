@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { CategoriasService } from './categorias.service.js';
+import { CreateCategoriaDto } from './dto/create-categoria.dto.js';
+import { UpdateCategoriaDto } from './dto/update-categoria.dto.js';
 
 @Controller('categorias')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,12 +38,12 @@ export class CategoriasController {
   }
 
   @Post()
-  create(@Body() data: any) {
+  create(@Body() data: CreateCategoriaDto) {
     return this.categoriasService.create(data);
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateCategoriaDto) {
     return this.categoriasService.update(id, data);
   }
 

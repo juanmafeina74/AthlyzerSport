@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 import { GlobalExceptionFilter } from './common/global-exception.filter.js';
 import { PrismaService } from './prisma/prisma.service.js';
@@ -10,6 +11,14 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: true },
+    }),
+  );
 
   if (process.env.NODE_ENV !== 'production') {
     app.enableCors({

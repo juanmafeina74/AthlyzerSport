@@ -9,6 +9,7 @@ export default function TemporadaEdit() {
   const navigate = useNavigate();
   const { id } = useParams();
   const temporadaId = Number(id);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     nombre: "",
     fecha_inicio: "",
@@ -31,11 +32,13 @@ export default function TemporadaEdit() {
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async () => {
+    setError("");
     const response = await temporadasService.update(temporadaId, form);
     if (response.ok) {
       navigate("/temporadas");
     } else {
-      alert("No se pudo actualizar la temporada");
+      const body = await response.json().catch(() => ({ message: "No se pudo actualizar la temporada." }));
+      setError(body.message ?? body.error ?? "No se pudo actualizar la temporada.");
     }
   };
 
@@ -47,6 +50,8 @@ export default function TemporadaEdit() {
         <FormInput label="Fecha de fin" name="fecha_fin" type="date" value={form.fecha_fin} onChange={handleChange} required />
         <FormInput label="Estado" name="estado" value={form.estado} onChange={handleChange} required />
       </div>
+
+      {error && <p className="rounded-lg bg-alert-danger px-4 py-3 text-sm text-red-800">{error}</p>}
 
       <div className="flex gap-3">
         <Button color="light" onClick={() => navigate(-1)}>Volver</Button>

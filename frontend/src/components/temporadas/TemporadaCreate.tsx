@@ -7,6 +7,7 @@ import temporadasService from "../services/temporadas.service";
 
 export default function TemporadaCreate() {
   const navigate = useNavigate();
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     nombre: "",
     fecha_inicio: "",
@@ -18,12 +19,13 @@ export default function TemporadaCreate() {
     setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async () => {
+    setError("");
     const response = await temporadasService.create(form);
     if (response.ok) {
       navigate("/temporadas");
     } else {
       const body = await response.json().catch(() => ({ message: "No se pudo crear la temporada." }));
-      alert(body.message ?? body.error ?? "No se pudo crear la temporada.");
+      setError(body.message ?? body.error ?? "No se pudo crear la temporada.");
     }
   };
 

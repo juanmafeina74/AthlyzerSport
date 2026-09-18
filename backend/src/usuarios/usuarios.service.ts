@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 
 const SALT_ROUNDS = 12;
 
@@ -30,11 +33,7 @@ export class UsuariosService {
     return this.toResponse(usuario);
   }
 
-  async create(data: any) {
-    this.validateRequiredText(data.nombre, 'El nombre es obligatorio.');
-    this.validateRequiredText(data.email, 'El email es obligatorio.');
-    this.validateRequiredText(data.password, 'La contraseña es obligatoria.');
-
+  async create(data: CreateUsuarioDto) {
     const rol = await this.findRole(data.id_rol);
 
     const usuario = await this.prisma.usuario.create({
@@ -43,7 +42,7 @@ export class UsuariosService {
         email: data.email.trim().toLowerCase(),
         password_hash: await bcrypt.hash(data.password.trim(), SALT_ROUNDS),
         id_rol: rol.id_rol,
-        activo: Boolean(data.activo),
+        activo: data.activo ?? true,
       },
       include: { rol: true },
     });
@@ -51,18 +50,16 @@ export class UsuariosService {
     return this.toResponse(usuario);
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UpdateUsuarioDto) {
     await this.findOne(id);
 
-    const updateData: any = {};
+    const updateData: Prisma.usuarioUncheckedUpdateInput = {};
 
     if (data.nombre !== undefined) {
-      this.validateRequiredText(data.nombre, 'El nombre es obligatorio.');
       updateData.nombre = data.nombre.trim();
     }
 
     if (data.email !== undefined) {
-      this.validateRequiredText(data.email, 'El email es obligatorio.');
       updateData.email = data.email.trim().toLowerCase();
     }
 
@@ -76,7 +73,7 @@ export class UsuariosService {
     }
 
     if (data.activo !== undefined) {
-      updateData.activo = Boolean(data.activo);
+      updateData.activo = data.activo;
     }
 
     const usuario = await this.prisma.usuario.update({
@@ -112,12 +109,6 @@ export class UsuariosService {
     }
 
     return rol;
-  }
-
-  private validateRequiredText(value: unknown, message: string) {
-    if (typeof value !== 'string' || !value.trim()) {
-      throw new BadRequestException(message);
-    }
   }
 
   private toResponse(usuario: any) {

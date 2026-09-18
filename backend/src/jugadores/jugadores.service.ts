@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateJugadorDto } from './dto/create-jugador.dto.js';
+import { UpdateJugadorDto } from './dto/update-jugador.dto.js';
 
 @Injectable()
 export class JugadoresService {
@@ -19,21 +21,19 @@ export class JugadoresService {
     return jugador;
   }
 
-  async create(data: any) {
+  async create(data: CreateJugadorDto) {
     return this.prisma.jugador.create({
       data: {
         dni: data.dni,
         nombre: data.nombre,
         apellidos: data.apellidos,
-        fecha_nacimiento: data.fecha_nacimiento
-          ? new Date(data.fecha_nacimiento)
-          : new Date(),
+        fecha_nacimiento: new Date(data.fecha_nacimiento),
         foto: data.foto ?? null,
       },
     });
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UpdateJugadorDto) {
     await this.findOne(id);
 
     return this.prisma.jugador.update({
@@ -45,7 +45,7 @@ export class JugadoresService {
         fecha_nacimiento: data.fecha_nacimiento
           ? new Date(data.fecha_nacimiento)
           : undefined,
-        foto: data.foto ?? null,
+        foto: data.foto,
       },
     });
   }

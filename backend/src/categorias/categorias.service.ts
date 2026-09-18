@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateCategoriaDto } from './dto/create-categoria.dto.js';
+import { UpdateCategoriaDto } from './dto/update-categoria.dto.js';
 
 @Injectable()
 export class CategoriasService {
@@ -26,28 +29,26 @@ export class CategoriasService {
     return categoria;
   }
 
-  async create(data: any) {
-    const nombre = this.getNombre(data.nombre);
-
+  async create(data: CreateCategoriaDto) {
     return this.prisma.categoria.create({
       data: {
-        nombre,
+        nombre: data.nombre.trim(),
         activo: data.activo !== false,
       },
     });
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UpdateCategoriaDto) {
     await this.findOne(id);
 
-    const updateData: { nombre?: string; activo?: boolean } = {};
+    const updateData: Prisma.categoriaUpdateInput = {};
 
     if (data.nombre !== undefined) {
-      updateData.nombre = this.getNombre(data.nombre);
+      updateData.nombre = data.nombre.trim();
     }
 
     if (data.activo !== undefined) {
-      updateData.activo = Boolean(data.activo);
+      updateData.activo = data.activo;
     }
 
     return this.prisma.categoria.update({ where: { id_categoria: id }, data: updateData });
@@ -69,13 +70,5 @@ export class CategoriasService {
 
     await this.prisma.categoria.delete({ where: { id_categoria: id } });
     return { deleted: true };
-  }
-
-  private getNombre(value: unknown) {
-    if (typeof value !== 'string' || !value.trim()) {
-      throw new BadRequestException('El nombre de la categoría es obligatorio.');
-    }
-
-    return value.trim();
   }
 }
