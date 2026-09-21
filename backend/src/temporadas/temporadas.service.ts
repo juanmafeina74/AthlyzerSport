@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateTemporadaDto } from './dto/create-temporada.dto.js';
+import { UpdateTemporadaDto } from './dto/update-temporada.dto.js';
 
 @Injectable()
 export class TemporadasService {
@@ -23,19 +25,7 @@ export class TemporadasService {
     return temporada;
   }
 
-  async create(data: any) {
-    if (!data.nombre || !data.nombre.trim()) {
-      throw new BadRequestException('El nombre de la temporada es obligatorio.');
-    }
-
-    if (!data.fecha_inicio) {
-      throw new BadRequestException('La fecha de inicio es obligatoria.');
-    }
-
-    if (!data.fecha_fin) {
-      throw new BadRequestException('La fecha de fin es obligatoria.');
-    }
-
+  async create(data: CreateTemporadaDto) {
     const fechaInicio = new Date(data.fecha_inicio);
     const fechaFin = new Date(data.fecha_fin);
 
@@ -57,10 +47,10 @@ export class TemporadasService {
     });
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UpdateTemporadaDto) {
     await this.findOne(id);
 
-    const updateData: any = {};
+    const updateData: { nombre?: string; fecha_inicio?: Date; fecha_fin?: Date; estado?: string } = {};
 
     if (data.nombre !== undefined) {
       updateData.nombre = data.nombre.trim();
@@ -85,7 +75,21 @@ export class TemporadasService {
   }
 
   async remove(id: number) {
-    await this.findOne(id);
+    const temporada = await this.prisma.temporada.findUnique({
+      where: { id_temporada: id },
+      include: { _count: { select: { equipo: true } } },
+    });
+
+    if (!temporada) {
+      throw new NotFoundException(`Temporada ${id} no encontrada`);
+    }
+
+    if (temporada._count.equipo > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar una temporada con equipos asociados. Elimina o reasigna primero sus equipos.',
+      );
+    }
+
     return this.prisma.temporada.delete({ where: { id_temporada: id } });
   }
 }

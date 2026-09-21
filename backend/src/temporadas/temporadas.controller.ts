@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { TemporadasService } from './temporadas.service.js';
+import { CreateTemporadaDto } from './dto/create-temporada.dto.js';
+import { UpdateTemporadaDto } from './dto/update-temporada.dto.js';
 
 @Controller('temporadas')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,13 +33,13 @@ export class TemporadasController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: any) {
+  create(@Body() data: CreateTemporadaDto) {
     return this.temporadasService.create(data);
   }
 
   @Put(':id')
   @Roles('admin')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateTemporadaDto) {
     return this.temporadasService.update(id, data);
   }
 

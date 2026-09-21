@@ -1,5 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateEquipoDto } from './dto/create-equipo.dto.js';
+import { UpdateEquipoDto } from './dto/update-equipo.dto.js';
 
 @Injectable()
 export class EquiposService {
@@ -23,9 +26,9 @@ export class EquiposService {
     return equipo;
   }
 
-  async create(data: any) {
-    const requestedTemporada = data.id_temporada ? Number(data.id_temporada) : undefined;
-    const requestedCategoria = data.id_categoria ? Number(data.id_categoria) : undefined;
+  async create(data: CreateEquipoDto) {
+    const requestedTemporada = data.id_temporada;
+    const requestedCategoria = data.id_categoria;
 
     if (!requestedTemporada) {
       throw new BadRequestException(
@@ -65,13 +68,13 @@ export class EquiposService {
     });
   }
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UpdateEquipoDto) {
     await this.findOne(id);
 
-    const updateData: any = {};
+    const updateData: Prisma.equipoUncheckedUpdateInput = {};
 
     if (data.id_temporada !== undefined) {
-      updateData.id_temporada = Number(data.id_temporada);
+      updateData.id_temporada = data.id_temporada;
     }
 
     if (data.nombre !== undefined) {
@@ -79,7 +82,7 @@ export class EquiposService {
     }
 
     if (data.id_categoria !== undefined) {
-      const requestedCategoria = data.id_categoria ? Number(data.id_categoria) : null;
+      const requestedCategoria = data.id_categoria ?? null;
 
       if (requestedCategoria) {
         const categoria = await this.prisma.categoria.findFirst({

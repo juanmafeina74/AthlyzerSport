@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { EquiposService } from './equipos.service.js';
+import { CreateEquipoDto } from './dto/create-equipo.dto.js';
+import { UpdateEquipoDto } from './dto/update-equipo.dto.js';
 
 @Controller('equipos')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,13 +33,13 @@ export class EquiposController {
 
   @Post()
   @Roles('admin')
-  create(@Body() data: any) {
+  create(@Body() data: CreateEquipoDto) {
     return this.equiposService.create(data);
   }
 
   @Put(':id')
   @Roles('admin')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateEquipoDto) {
     return this.equiposService.update(id, data);
   }
 

@@ -9,6 +9,7 @@ export default function JugadorEdit() {
   const navigate = useNavigate();
   const { id } = useParams();
   const jugadorId = Number(id);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     dni: "",
     nombre: "",
@@ -32,8 +33,14 @@ export default function JugadorEdit() {
   };
 
   const handleSubmit = async () => {
-    await jugadoresService.update(jugadorId, form);
-    navigate("/jugadores");
+    const response = await jugadoresService.update(jugadorId, form);
+
+    if (response.ok) {
+      navigate("/jugadores");
+    } else {
+      const body = await response.json().catch(() => ({}));
+      setError(body.message ?? "No se pudo guardar el jugador.");
+    }
   };
 
   return (
@@ -51,6 +58,8 @@ export default function JugadorEdit() {
       />
         <FormInput name="foto" label="Foto (URL)" value={form.foto} onChange={handleChange} />
       </div>
+
+      {error && <p className="rounded-lg bg-alert-danger px-4 py-3 text-sm text-red-800">{error}</p>}
 
       <div className="flex gap-3">
         <Button color="light" onClick={() => navigate(-1)}>Volver</Button>

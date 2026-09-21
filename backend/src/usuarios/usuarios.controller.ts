@@ -13,6 +13,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { UsuariosService } from './usuarios.service.js';
+import { CreateUsuarioDto } from './dto/create-usuario.dto.js';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto.js';
 
 @Controller('usuarios')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,12 +38,12 @@ export class UsuariosController {
   }
 
   @Post()
-  create(@Body() data: any) {
+  create(@Body() data: CreateUsuarioDto) {
     return this.usuariosService.create(data);
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() data: any) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() data: UpdateUsuarioDto) {
     return this.usuariosService.update(id, data);
   }
 

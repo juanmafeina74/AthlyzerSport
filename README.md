@@ -1,6 +1,8 @@
 # AthLyzer Sports Train
 
-Documentacion de estado del proyecto a fecha 2026-09-15. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
+Documentacion de estado del proyecto a fecha 2026-09-18. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
+
+> Para un analisis tecnico mas detallado (arquitectura, inventario funcional modulo a modulo, riesgos priorizados y roadmap), ver [docs/ANALISIS-PROYECTO.md](docs/ANALISIS-PROYECTO.md).
 
 ## Resumen Ejecutivo
 
@@ -15,6 +17,10 @@ Estado actual:
 - Rutas CRUD protegidas por token; las mutaciones estan restringidas a rol `admin`.
 - Gestion CRUD de usuarios restringida a administradores.
 - Gestion CRUD de categorías deportivas y relación de cada equipo con una categoría.
+- Validacion de entrada con DTOs (`class-validator`) y `ValidationPipe` global en todos los endpoints (auth, equipos, jugadores, categorías, usuarios, temporadas).
+- Rate limiting con `@nestjs/throttler`: limite global de 100 peticiones/minuto por IP y limite reforzado de 5 intentos/minuto en `POST /api/auth/login`.
+- Gestion de plantillas de equipo (asignar/quitar jugadores) mediante una pantalla de tipo "dual listbox" (jugadores disponibles vs. plantilla del equipo), con soporte de selección multiple y acciones en bloque.
+- Tests de integracion (e2e) que cubren JWT/roles y rate limiting en endpoints protegidos: sin token, token invalido, rol no admin, rol admin y bloqueo por exceso de intentos de login, extendidos a equipos, jugadores, categorias, usuarios, temporadas y a los distintos casos de negocio de `auth.login`.
 - Frontend con rutas privadas: si no hay usuario logado con token, redirige a `/login`.
 - UI unificada alrededor de componentes `Card`, `Button`, `LinkButton`, `FormInput`, `FormSelect` y `FormTextarea`.
 
@@ -143,6 +149,8 @@ El backend esta en `backend/` y usa:
 - bcrypt para hash de contrasenas.
 - `@nestjs/jwt` para emitir y verificar JWT.
 - `@nestjs/config` para cargar `.env`.
+- `class-validator`, `class-transformer` y `@nestjs/mapped-types` para DTOs y `ValidationPipe` global.
+- `@nestjs/throttler` para rate limiting global y por endpoint.
 - Vitest para tests.
 - Oxlint para lint.
 
@@ -162,14 +170,15 @@ Estructura principal del backend:
 
 ```text
 backend/src/
-	main.ts                         # Bootstrap Nest, prefijo /api, CORS, seed auth
+	main.ts                         # Bootstrap Nest, prefijo /api, CORS, ValidationPipe global, seed auth
 	app.module.ts                   # Modulo raiz
 	auth/                           # Login, JWT, roles y seed de usuarios demo
 	categorias/                     # CRUD de categorías deportivas
 	common/global-exception.filter.ts
 	prisma/prisma.service.ts
-	equipos/                        # CRUD equipos
-	jugadores/                      # CRUD jugadores
+	equipos/                        # CRUD equipos + DTOs (create/update)
+	jugadores/                      # CRUD jugadores + DTOs (create/update)
+	jugador-equipo/                 # Gestion de plantilla: asignar/quitar jugadores de un equipo
 	temporadas/                     # CRUD temporadas
 	usuarios/                       # CRUD usuarios y consulta de roles
 ```
@@ -279,6 +288,8 @@ Restriccion actual:
 - `PUT`: requiere rol `admin`.
 - `DELETE`: requiere rol `admin`.
 
+Ademas, `POST` y `PUT` de equipos y jugadores validan el body contra un DTO (`class-validator`) mediante el `ValidationPipe` global configurado en `main.ts` (`whitelist`, `forbidNonWhitelisted`, `transform`). Un payload con campos faltantes, con tipos incorrectos o con propiedades no declaradas en el DTO devuelve `400 Bad Request` antes de llegar al servicio.
+
 Endpoints principales:
 
 ```text
@@ -315,7 +326,41 @@ GET    /api/temporadas/:id
 POST   /api/temporadas        admin
 PUT    /api/temporadas/:id    admin
 DELETE /api/temporadas/:id    admin
+
+GET    /api/equipos/:idEquipo/plantilla                 # jugadores activos en el equipo
+GET    /api/equipos/:idEquipo/plantilla/disponibles     # jugadores libres (filtrable por ?search=)
+POST   /api/equipos/:idEquipo/plantilla                 admin  # asigna un jugador { id_jugador, dorsal? }
+POST   /api/equipos/:idEquipo/plantilla/bulk-assign     admin  # asigna varios { id_jugadores: number[] }
+POST   /api/equipos/:idEquipo/plantilla/bulk-remove     admin  # quita varios { id_jugadores: number[] }
+DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin  # quita un jugador
 ```
+
+## Validacion de Datos (DTOs)
+
+Todos los endpoints de creación y actualización usan DTOs tipados con `class-validator` en lugar de `data: any`:
+
+- `backend/src/auth/dto/login.dto.ts`.
+- `backend/src/equipos/dto/create-equipo.dto.ts` y `update-equipo.dto.ts`.
+- `backend/src/jugadores/dto/create-jugador.dto.ts` y `update-jugador.dto.ts`.
+- `backend/src/categorias/dto/create-categoria.dto.ts` y `update-categoria.dto.ts`.
+- `backend/src/usuarios/dto/create-usuario.dto.ts` y `update-usuario.dto.ts`.
+- `backend/src/temporadas/dto/create-temporada.dto.ts` y `update-temporada.dto.ts`.
+
+Los DTOs de actualización se generan con `PartialType` de `@nestjs/mapped-types` a partir del DTO de creación, de forma que todos los campos son opcionales en `PUT` pero mantienen las mismas reglas de validación si se envían.
+
+El `ValidationPipe` global (`backend/src/main.ts`) aplica a toda la aplicación:
+
+- `whitelist: true`: elimina propiedades no declaradas en el DTO.
+- `forbidNonWhitelisted: true`: rechaza la petición con `400` si llegan propiedades no declaradas, en vez de ignorarlas silenciosamente.
+- `transform: true`: convierte el payload plano en una instancia de la clase DTO antes de llegar al controlador.
+
+## Rate Limiting
+
+El backend usa `@nestjs/throttler` para mitigar fuerza bruta y abuso:
+
+- Límite global: 100 peticiones/minuto por IP, aplicado con un `ThrottlerGuard` registrado como `APP_GUARD` en `backend/src/app.module.ts`.
+- Límite reforzado en `POST /api/auth/login`: 5 intentos/minuto por IP mediante `@Throttle({ default: { limit: 5, ttl: 60_000 } })` en `auth.controller.ts`.
+- Al superar el límite, el endpoint responde `429 Too Many Requests`.
 
 ## Base de Datos
 
@@ -497,9 +542,11 @@ npm run build
 Resultado conocido:
 
 - Backend build: correcto.
-- Backend tests: correcto, 2 tests pasan.
+- Backend tests: correcto, 14 tests pasan (2 de `app.controller.spec.ts` + 12 de tests unitarios de servicio en `categorias`, `temporadas`, `usuarios` y `jugadores`).
 - Backend lint: correcto.
 - Frontend build: correcto.
+
+Ademas, `backend/test/protected-endpoints.e2e-spec.ts` anade 30 tests de integracion organizados en 5 bloques independientes (equipos/usuarios, casos de negocio de `auth.login`, categorias, jugadores y temporadas), cada uno con su propia instancia de la app y un `PrismaService` mockeado, por lo que no requieren una base de datos real. Cubren JWT/roles (401/403), validacion de DTOs (400), rate limiting en login (429) y los casos de negocio de login: usuario inexistente (404), usuario inactivo (400) y password incorrecta (400). El e2e historico `backend/test/app.e2e-spec.ts` si necesita una PostgreSQL real conectada via `DATABASE_URL` para pasar.
 
 ## Gestion de Usuarios
 
@@ -542,6 +589,22 @@ Cada categoría tiene:
 El listado muestra el ID, nombre y una etiqueta de estado verde claro para categorías activas o rojo claro para inactivas.
 
 Las categorías activas se cargan en el selector de categoría al crear o editar un equipo. La categoría es opcional para un equipo. No es posible eliminar una categoría que esté asignada a uno o más equipos; primero debe reasignarse o quitarse de esos equipos.
+
+De la misma manera, tampoco es posible eliminar una temporada que tenga equipos asociados: `DELETE /api/temporadas/:id` responde con un error `400` indicando que primero hay que eliminar o reasignar sus equipos, evitando que el borrado en cascada a nivel de base de datos (`onDelete: Cascade` en `equipo.id_temporada`) ocurra sin aviso previo desde la API.
+
+## Gestion de Plantillas (Jugadores por Equipo)
+
+Desde el listado de equipos, el botón "Plantilla" abre `/equipos/plantilla/:id`, una pantalla de tipo **dual listbox / transfer list**:
+
+- Columna izquierda: jugadores disponibles (sin relación activa con el equipo), filtrables por nombre, apellidos o DNI mediante un buscador de texto libre.
+- Columna derecha: la plantilla actual del equipo (jugadores con relación `jugador_equipo` activa), mostrando su dorsal si tiene uno asignado.
+- Cada columna permite selección individual o multiple (Ctrl/Cmd + clic, Mayús + clic), y los botones "Añadir →" / "← Quitar" mueven en bloque los seleccionados de una columna a otra.
+
+A nivel de datos, "mover" un jugador no lo borra fisicamente: la tabla `jugador_equipo` usa un patron de borrado logico (`activo`, `fecha_inicio`, `fecha_fin`), por lo que quitar un jugador desactiva su relacion (conservando el historico) y volver a añadirlo reactiva la relacion existente en lugar de duplicarla.
+
+Endpoints usados (ver sección "Autorizacion de Endpoints"): lectura disponible para cualquier rol autenticado; asignar/quitar (individual o en bloque) requiere rol `admin`.
+
+Limitacion conocida: el filtro de disponibles solo es por texto (nombre/apellidos/DNI); el esquema actual no vincula `jugador` con `categoria` ni con `posicion`, por lo que no es posible filtrar por esos campos sin ampliar el modelo de datos.
 
 Aviso no bloqueante observado: Vitest muestra una recomendacion relacionada con `vite-tsconfig-paths`, indicando que Vite ya soporta resolucion nativa de paths mediante `resolve.tsconfigPaths`.
 
@@ -603,17 +666,14 @@ Si aparece `El usuario esta inactivo`, el usuario existe pero tiene `activo = fa
 ## Pendientes y Riesgos Conocidos
 - No hay refresh tokens; cuando caduque el JWT, el usuario debe iniciar sesion de nuevo.
 - El token se guarda en `localStorage`; es simple para desarrollo, pero para produccion conviene valorar cookies `HttpOnly` seguras o una estrategia mas robusta.
-- Falta endurecer validacion DTO en backend; varios controladores reciben `data: any`.
-- Falta ampliar tests para autenticacion, autorizacion y flujos CRUD protegidos.
 - npm reporto vulnerabilidades tras instalar dependencias; conviene revisar con `npm audit` por carpeta.
 - Las rutas de administracion en frontend no comprueban rol por si solas; la proteccion fuerte esta en backend.
 - Los botones de planes en administracion apuntan actualmente a `/dashboard`; las funcionalidades de planes aun no estan implementadas.
+- No hay cabeceras de seguridad HTTP adicionales (`helmet`) ni limites explicitos de tamano de payload.
 
 ## Siguiente Paso Recomendado
 
-El siguiente bloque tecnico recomendable es reforzar validaciones backend:
+El siguiente bloque tecnico recomendable es:
 
-- Crear DTOs para login y CRUD.
-- Activar `ValidationPipe` global.
-- Sustituir `data: any` por tipos/DTOs concretos.
-- Anadir tests de autorizacion: sin token, token invalido, rol no admin y rol admin.
+- **Configurar CI** (build + test + lint de backend y build de frontend) en cada PR/push a la rama principal.
+- Revisar y resolver las vulnerabilidades reportadas por `npm audit` en backend y frontend.

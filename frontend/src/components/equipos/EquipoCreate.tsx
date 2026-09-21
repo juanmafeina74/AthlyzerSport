@@ -83,14 +83,17 @@ export default function EquipoCreate() {
           name="id_temporada"
           value={form.id_temporada}
           onChange={handleChange}
-          options={temporadas.map((t) => ({
-            value: String(t.id_temporada),
-            label: `${t.nombre} (${t.estado})`,
-          }))}
+          options={[
+            { value: "", label: "Selecciona una temporada" },
+            ...temporadas.map((t) => ({
+              value: String(t.id_temporada),
+              label: `${t.nombre} (${t.estado})`,
+            })),
+          ]}
         />
       </div>
 
-      {error && <p className="text-red-600 mt-4">{error}</p>}
+      {error && <p className="rounded-lg bg-alert-danger px-4 py-3 text-sm text-red-800">{error}</p>}
 
       <div className="flex gap-3">
         <Button color="light" onClick={() => navigate(-1)}>Volver</Button>
