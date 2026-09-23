@@ -673,6 +673,10 @@ Si aparece `El usuario esta inactivo`, el usuario existe pero tiene `activo = fa
 
 ## Siguiente Paso Recomendado
 
+DATABASE_URL="postgresql://admin:MyTr2026@localhost:5432/AthLyzerDB"
+JWT_SECRET="53791e2fba3d3a28de8aac4a52606080841ae6e8287f9a333d41143ffe5fb6900ec2671084b99a7a1425f7cbb67b8ef9f65d06ff91d50f6c395e8c23c7845c91"
+JWT_EXPIRES_IN="8h"
+
 El siguiente bloque tecnico recomendable es:
 
 - **Configurar CI** (build + test + lint de backend y build de frontend) en cada PR/push a la rama principal.

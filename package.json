@@ -6,12 +6,16 @@
   "scripts": {
     "cleanup": "node ./scripts/cleanup-ports.js",
     "prisma:reset": "node ./scripts/reset-prisma-client.js",
+    "prisma:migrate": "npm --prefix ./backend run prisma:migrate",
     "start:backend": "npm --prefix ./backend run start:dev",
     "start:frontend": "npm --prefix ./frontend run dev",
-    "start": "npm run cleanup && npm run prisma:reset && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors cyan,magenta \"npm --prefix ./backend run start:dev\" \"wait-on http://localhost:3000/api && npm --prefix ./frontend run dev\""
+    "start": "npm run cleanup && npm run prisma:migrate && npm run prisma:reset && concurrently --kill-others-on-fail --names backend,frontend --prefix-colors cyan,magenta \"npm --prefix ./backend run start:dev\" \"wait-on http://localhost:3000/api && npm --prefix ./frontend run dev\""
   },
   "devDependencies": {
     "concurrently": "^9.2.3",
     "wait-on": "^8.0.2"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0"
   }
 }
