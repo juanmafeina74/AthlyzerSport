@@ -4,13 +4,13 @@ import { Sidebar } from "./Sidebar";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex min-h-screen flex-col bg-gray-100 md:h-screen md:flex-row">
       <Sidebar />
 
-      <div className="flex flex-col flex-1">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Header />
 
-        <main className="p-8 overflow-auto">
+        <main className="overflow-auto p-4 md:p-8">
           {children}
         </main>
       </div>

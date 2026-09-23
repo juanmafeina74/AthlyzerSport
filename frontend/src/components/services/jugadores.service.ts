@@ -7,6 +7,16 @@ export default {
   getById: async (id: number) =>
     (await fetch(`${API}/${id}`, { headers: authHeaders() })).json(),
 
+  uploadPhoto: async (id: number, photo: File) => {
+    const data = new FormData();
+    data.append("foto", photo);
+    return fetch(`${API}/${id}/foto`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: data,
+    });
+  },
+
   create: async (data: any) =>
     await fetch(API, {
       method: "POST",

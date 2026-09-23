@@ -1,15 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import path from 'node:path';
 import { AppModule } from './app.module.js';
 import { GlobalExceptionFilter } from './common/global-exception.filter.js';
 import { PrismaService } from './prisma/prisma.service.js';
 import { seedDefaultAuthData } from './auth/auth.seed.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const prisma = app.get(PrismaService);
 
   app.setGlobalPrefix('api');
+  app.useStaticAssets(path.resolve(process.cwd(), 'uploads'), { prefix: '/uploads/' });
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({

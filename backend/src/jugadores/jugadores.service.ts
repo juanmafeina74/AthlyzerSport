@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateJugadorDto } from './dto/create-jugador.dto.js';
 import { UpdateJugadorDto } from './dto/update-jugador.dto.js';
+
+type UploadedPhoto = { buffer: Buffer; mimetype: string };
 
 @Injectable()
 export class JugadoresService {
@@ -14,7 +19,25 @@ export class JugadoresService {
   }
 
   async findOne(id: number) {
-    const jugador = await this.prisma.jugador.findUnique({ where: { id_jugador: id } });
+    const jugador = await this.prisma.jugador.findUnique({
+      where: { id_jugador: id },
+      include: {
+        jugador_equipo: {
+          include: {
+            equipo: {
+              include: { categoria: true, temporada: true },
+            },
+          },
+          orderBy: { fecha_inicio: 'desc' },
+        },
+        lesion: { orderBy: { fecha_inicio: 'desc' } },
+        medicion_antropometrica: {
+          include: { evaluador: { select: { id_usuario: true, nombre: true } } },
+          orderBy: [{ fecha: 'desc' }, { id_medicion: 'desc' }],
+          take: 5,
+        },
+      },
+    });
     if (!jugador) {
       throw new NotFoundException(`Jugador ${id} no encontrado`);
     }
@@ -50,8 +73,48 @@ export class JugadoresService {
     });
   }
 
+  async updatePhoto(id: number, file: UploadedPhoto) {
+    const jugador = await this.findOne(id);
+    const extensionByMime: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+    };
+    const fileName = `${randomUUID()}${extensionByMime[file.mimetype]}`;
+    const uploadDirectory = path.resolve(process.cwd(), 'uploads/jugadores');
+    const filePath = path.join(uploadDirectory, fileName);
+    const publicPath = `/uploads/jugadores/${fileName}`;
+
+    await mkdir(uploadDirectory, { recursive: true });
+    await writeFile(filePath, file.buffer);
+
+    try {
+      const updated = await this.prisma.jugador.update({
+        where: { id_jugador: id },
+        data: { foto: publicPath },
+      });
+      await this.removeLocalPhoto(jugador.foto);
+      return updated;
+    } catch (error) {
+      await unlink(filePath).catch(() => undefined);
+      throw error;
+    }
+  }
+
   async remove(id: number) {
-    await this.findOne(id);
-    return this.prisma.jugador.delete({ where: { id_jugador: id } });
+    const jugador = await this.findOne(id);
+    const deleted = await this.prisma.jugador.delete({ where: { id_jugador: id } });
+    await this.removeLocalPhoto(jugador.foto);
+    return deleted;
+  }
+
+  private async removeLocalPhoto(photo: string | null) {
+    const prefix = '/uploads/jugadores/';
+    if (!photo?.startsWith(prefix)) {
+      return;
+    }
+
+    const fileName = path.basename(photo);
+    await unlink(path.resolve(process.cwd(), 'uploads/jugadores', fileName)).catch(() => undefined);
   }
 }

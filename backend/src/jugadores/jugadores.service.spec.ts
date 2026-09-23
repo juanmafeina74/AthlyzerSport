@@ -3,7 +3,7 @@ import { JugadoresService } from './jugadores.service.js';
 
 function createService() {
   const prisma = {
-    jugador: { create: vi.fn() },
+    jugador: { create: vi.fn(), findUnique: vi.fn() },
   };
 
   return { service: new JugadoresService(prisma as any), prisma };
@@ -39,5 +39,32 @@ describe('JugadoresService.create (unicidad de DNI)', () => {
     expect(prisma.jugador.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ dni: '12345678A' }) }),
     );
+  });
+});
+
+describe('JugadoresService.findOne', () => {
+  it('carga la ficha con equipos, lesiones y las cinco mediciones más recientes', async () => {
+    const { service, prisma } = createService();
+    prisma.jugador.findUnique.mockResolvedValue({ id_jugador: 1 });
+
+    await service.findOne(1);
+
+    expect(prisma.jugador.findUnique).toHaveBeenCalledWith({
+      where: { id_jugador: 1 },
+      include: {
+        jugador_equipo: {
+          include: {
+            equipo: { include: { categoria: true, temporada: true } },
+          },
+          orderBy: { fecha_inicio: 'desc' },
+        },
+        lesion: { orderBy: { fecha_inicio: 'desc' } },
+        medicion_antropometrica: {
+          include: { evaluador: { select: { id_usuario: true, nombre: true } } },
+          orderBy: [{ fecha: 'desc' }, { id_medicion: 'desc' }],
+          take: 5,
+        },
+      },
+    });
   });
 });

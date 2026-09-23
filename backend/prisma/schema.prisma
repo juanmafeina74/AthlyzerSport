@@ -14,13 +14,14 @@ model rol {
 }
 
 model usuario {
-  id_usuario   Int      @id @default(autoincrement())
-  nombre       String   @db.VarChar(100)
-  email        String   @unique @db.VarChar(150)
-  password_hash String  @db.VarChar(255)
-  id_rol       Int
-  activo       Boolean  @default(true)
-  rol          rol      @relation(fields: [id_rol], references: [id_rol])
+  id_usuario               Int                       @id @default(autoincrement())
+  nombre                   String                    @db.VarChar(100)
+  email                    String                    @unique @db.VarChar(150)
+  password_hash            String                    @db.VarChar(255)
+  id_rol                   Int
+  activo                   Boolean                   @default(true)
+  rol                      rol                       @relation(fields: [id_rol], references: [id_rol])
+  mediciones_antropometricas medicion_antropometrica[]
 }
 
 model equipo {
@@ -91,18 +92,49 @@ model lesion {
 }
 
 model medicion_antropometrica {
-  id_medicion    Int      @id @default(autoincrement())
-  id_jugador     Int
-  fecha_medicion DateTime @db.Date
-  peso           Decimal? @db.Decimal(5, 2)
-  altura         Decimal? @db.Decimal(5, 2)
-  grasa_corporal Decimal? @db.Decimal(5, 2)
-  masa_muscular  Decimal? @db.Decimal(5, 2)
-  observaciones  String?
-  jugador        jugador  @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
+  id_medicion                    Int      @id @default(autoincrement())
+  id_jugador                     Int
+  id_evaluador                   Int
+  fecha                          DateTime @default(now())
+  peso_kg                        Float
+  talla_cm                       Float
+  talla_sentado_cm               Float?
+  pliegue_tricipital             Float
+  pliegue_subescapular           Float
+  pliegue_supraespinal           Float
+  pliegue_abdominal              Float
+  pliegue_muslo                  Float
+  pliegue_pantorrilla            Float
+  pliegue_bicipital              Float?
+  pliegue_cresta_iliaca          Float?
+  perimetro_brazo_relajado       Float?
+  perimetro_brazo_flexionado     Float?
+  perimetro_cintura              Float?
+  perimetro_cadera               Float?
+  perimetro_muslo_medio          Float?
+  perimetro_pantorrilla          Float?
+  diametro_biepicondilar_humero  Float?
+  diametro_biepicondilar_femur   Float?
+  diametro_biestiloideo          Float?
+  sumatoria_6_pliegues           Float?
+  sumatoria_8_pliegues           Float?
+  porcentaje_grasa               Float?
+  porcentaje_musculo             Float?
+  somatotipo_endomorfia          Float?
+  somatotipo_mesomorfia          Float?
+  somatotipo_ectomorfia          Float?
+  somatocarta_x                  Float?
+  somatocarta_y                  Float?
+  observaciones                  String?  @db.Text
+  created_at                     DateTime @default(now())
+  updated_at                     DateTime @updatedAt
+  jugador                        jugador  @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
+  evaluador                      usuario  @relation(fields: [id_evaluador], references: [id_usuario])
 
-  @@index([fecha_medicion], map: "idx_medicion_fecha")
+  @@index([fecha], map: "idx_medicion_fecha")
+  @@index([id_evaluador], map: "idx_medicion_evaluador")
   @@index([id_jugador], map: "idx_medicion_jugador")
+  @@map("medicion_antropometrica")
 }
 
 model posicion {

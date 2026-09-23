@@ -15,6 +15,8 @@ import JugadorDelete from "./components/jugadores/JugadorDelete";
 import JugadorList from "./components/jugadores/JugadorList";
 import JugadorEdit from "./components/jugadores/JugadorEdit";
 import JugadorCreate from "./components/jugadores/JugadorCreate";
+import JugadorDetail from "./components/jugadores/JugadorDetail";
+import MedicionAntropometricaCreate from "./components/mediciones-antropometricas/MedicionAntropometricaCreate";
 import TemporadaList from "./components/temporadas/TemporadaList";
 import TemporadaCreate from "./components/temporadas/TemporadaCreate";
 import TemporadaEdit from "./components/temporadas/TemporadaEdit";
@@ -66,6 +68,19 @@ function RequireAdmin({ children }: { children: ReactNode }) {
   return <Layout>{children}</Layout>;
 }
 
+function RequireEvaluator({ children }: { children: ReactNode }) {
+  const rawUser = localStorage.getItem("athlyzer_user");
+
+  if (!isAuthenticated() || !rawUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const user = JSON.parse(rawUser) as { role?: string };
+  return user.role === "admin" || user.role === "usuario"
+    ? <Layout>{children}</Layout>
+    : <Navigate to="/dashboard" replace />;
+}
+
 function RouteFallback() {
   return <Navigate to={isAuthenticated() ? "/dashboard" : "/login"} replace />;
 }
@@ -92,9 +107,11 @@ export default function Router() {
         <Route path="/equipos/borrar/:id" element={<RequireAuth><EquipoDelete /></RequireAuth>} />
         <Route path="/equipos/plantilla/:id" element={<RequireAuth><EquipoPlantilla /></RequireAuth>} />
         <Route path="/jugadores" element={<RequireAuth><JugadorList /></RequireAuth>} />
+        <Route path="/jugadores/:id" element={<RequireAuth><JugadorDetail /></RequireAuth>} />
         <Route path="/jugadores/crear" element={<RequireAuth><JugadorCreate /></RequireAuth>} />
         <Route path="/jugadores/editar/:id" element={<RequireAuth><JugadorEdit /></RequireAuth>} />
         <Route path="/jugadores/borrar/:id" element={<RequireAuth><JugadorDelete /></RequireAuth>} />
+        <Route path="/mediciones-antropometricas/crear" element={<RequireEvaluator><MedicionAntropometricaCreate /></RequireEvaluator>} />
         <Route path="/temporadas" element={<RequireAuth><TemporadaList /></RequireAuth>} />
         <Route path="/temporadas/crear" element={<RequireAuth><TemporadaCreate /></RequireAuth>} />
         <Route path="/temporadas/editar/:id" element={<RequireAuth><TemporadaEdit /></RequireAuth>} />
