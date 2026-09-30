@@ -1,114 +1,171 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend AthLyzer Sports Train
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+API NestJS 12 para la gestión deportiva de AthLyzer Sports Train. Usa Prisma 6 sobre PostgreSQL y expone todas las rutas bajo `/api`.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Requisitos y configuración
 
-## Description
+- Node.js y npm.
+- PostgreSQL accesible mediante `DATABASE_URL`.
+- `backend/.env` basado en `backend/.env.example`.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Variables principales:
 
-## Project setup
-
-```bash
-$ npm install
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/athlyzer"
+JWT_SECRET="una-clave-larga-y-aleatoria"
+JWT_EXPIRES_IN="8h"
+DEMO_ADMIN_PASSWORD="..."
+DEMO_USER_PASSWORD="..."
+DEMO_PLAYER_PASSWORD="..."
 ```
 
-## Compile and run the project
+Las variables `DEMO_*` solo se usan para usuarios de demostración en entornos no productivos. Nunca se deben publicar valores reales en documentación o control de versiones.
+
+## Comandos
+
+Desde `backend/`:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
+npm run build
+npm run start:dev
+npm run test
+npm run lint
+npm run test:e2e
 ```
 
-## Run tests
+`npm run test:e2e` necesita una PostgreSQL real configurada en `DATABASE_URL`; la mayoría de los tests unitarios y de endpoints protegidos usan Prisma mockeado.
+
+## Arranque desde la raíz
+
+El comando recomendado es `npm start` desde la raíz. Antes de iniciar:
+
+1. Libera los puertos 3000 y 5173 mediante `scripts/cleanup-ports.js`.
+2. Regenera Prisma con `scripts/reset-prisma-client.js`.
+3. Arranca Nest en modo watch y espera a `/api` antes de iniciar Vite.
+
+El regenerador invoca el CLI JavaScript local de Prisma mediante Node. Esta decisión evita bloqueos de `npx` y problemas de quoting en Windows cuando el workspace está bajo una ruta con espacios.
+
+Regeneración manual:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npx prisma generate --schema prisma/schema.prisma
+npx prisma migrate deploy --schema prisma/schema.prisma
 ```
 
-## Deployment
+## Arquitectura
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+```text
+HTTP /api
+  -> guards JWT y roles
+  -> ValidationPipe global
+  -> controller
+  -> service de dominio
+  -> PrismaService
+  -> PostgreSQL
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Módulos principales:
 
-## Observability
+- `auth`: login, JWT, roles y seed de usuarios demo.
+- `categorias`: categorías deportivas.
+- `equipos`: equipos por temporada y categoría.
+- `jugadores`: CRUD, ficha ampliada y fotografía.
+- `jugador-equipo`: asignación y baja lógica de jugadores en plantillas.
+- `mediciones-antropometricas`: protocolo ISAK, cálculos y auditoría del evaluador.
+- `temporadas`: temporadas deportivas.
+- `usuarios`: administración de usuarios y roles.
+- `common`: filtro global de errores de Prisma.
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+## Seguridad y validación
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+Los endpoints protegidos usan `JwtAuthGuard` y `RolesGuard`. El `ValidationPipe` global aplica `whitelist`, `forbidNonWhitelisted`, `transform` y conversión implícita de tipos.
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+- Lecturas generales requieren JWT.
+- Mutaciones CRUD de equipos, jugadores y temporadas requieren `admin`.
+- Categorías y usuarios requieren `admin` para lectura y escritura.
+- Mediciones antropométricas permiten `admin` y `usuario`.
+- Subir o reemplazar la foto de un jugador requiere `admin`.
+- Throttling global: 100 peticiones por minuto; login: 5 intentos por minuto.
 
-## Resources
+## API principal
 
-Check out a few resources that may come in handy when working with NestJS:
+### Autenticación
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```text
+POST /api/auth/login
+```
 
-## Support
+Devuelve `id_usuario`, nombre, email, rol, estado y `accessToken`. Las llamadas protegidas deben enviar `Authorization: Bearer <token>`.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Jugadores
 
-## Stay in touch
+```text
+GET    /api/jugadores
+GET    /api/jugadores/:id
+POST   /api/jugadores                 admin
+PUT    /api/jugadores/:id             admin
+DELETE /api/jugadores/:id             admin
+POST   /api/jugadores/:id/foto        admin
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+`GET /api/jugadores/:id` devuelve datos personales, equipos actuales e históricos, lesiones y las cinco mediciones antropométricas más recientes con su evaluador.
 
-## License
+La subida de foto usa `multipart/form-data`, campo `foto`, formatos JPEG/PNG/WebP y máximo 5 MB. El archivo se guarda en `uploads/jugadores/`, servido como `/uploads/jugadores/...`; la columna `jugador.foto` solo guarda la ruta. El directorio está excluido de Git. En producción puede sustituirse por almacenamiento de objetos o CDN manteniendo el mismo contrato de URL.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### Plantillas
+
+```text
+GET    /api/equipos/:idEquipo/plantilla
+GET    /api/equipos/:idEquipo/plantilla/disponibles?search=...
+POST   /api/equipos/:idEquipo/plantilla                 admin
+POST   /api/equipos/:idEquipo/plantilla/bulk-assign     admin
+POST   /api/equipos/:idEquipo/plantilla/bulk-remove     admin
+DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin
+```
+
+Las bajas son lógicas: se conserva el histórico y una reasignación reactiva la relación existente.
+
+### Mediciones antropométricas
+
+```text
+GET  /api/mediciones-antropometricas/jugador/:idJugador  admin, usuario
+POST /api/mediciones-antropometricas                     admin, usuario
+```
+
+El `POST` recibe datos brutos del protocolo ISAK. El servicio calcula y persiste sumatoria de seis/ocho pliegues cuando corresponde, porcentaje de grasa mediante Faulkner y componentes Heath-Carter disponibles. `id_evaluador` se obtiene de `request.user.id_usuario`, no del body.
+
+## Prisma y modelo de datos
+
+El esquema está en `prisma/schema.prisma`. Modelos: `rol`, `usuario`, `categoria`, `temporada`, `equipo`, `jugador`, `jugador_equipo`, `lesion`, `medicion_antropometrica` y `posicion`.
+
+La migración `20260922120000_mediciones_antropometricas_isak` sustituye el modelo antropométrico inicial por el protocolo ISAK completo. Si hubiera mediciones antiguas, la migración se detiene para evitar atribuir evaluadores o inventar pliegues inexistentes.
+
+Migraciones actuales:
+
+```text
+20260910140914_init
+20260910141245_init
+20260914110403_auth_roles_users
+20260916090000_categorias_equipos
+20260922120000_mediciones_antropometricas_isak
+```
+
+## Calidad
+
+Validación de referencia a 2026-09-23:
+
+- `npm run build`: correcto.
+- `npm run test`: 25 tests correctos en 8 archivos.
+- `npm run lint`: correcto.
+- `npm run test:e2e`: requiere PostgreSQL real para el e2e histórico; los tests protegidos mockean Prisma.
+
+Las pruebas nuevas cubren cálculos antropométricos, persistencia del evaluador autenticado, rechazo de jugador inexistente y carga de relaciones de la ficha ampliada.
+
+## Pendientes conocidos
+
+- No existe todavía CRUD de lesiones ni relación entre jugador y posición.
+- La masa muscular antropométrica no se calcula mientras no se definan una fórmula validada y las variables requeridas.
+- No hay refresh tokens ni cookies HttpOnly; el frontend guarda el JWT en `localStorage`.
+- No hay `helmet` ni CI configurado.
+- Debe revisarse el resultado de `npm audit` antes de un despliegue.

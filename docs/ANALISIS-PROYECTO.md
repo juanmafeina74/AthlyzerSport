@@ -1,158 +1,256 @@
-# Análisis Completo del Proyecto — AthLyzer Sports Train
+# Análisis del Proyecto: AthLyzer Sports Train
 
-Fecha de análisis: 2026-09-18.
+Fecha de actualización: 2026-09-23.
 
-Este documento amplía el [README.md](../README.md) con un análisis técnico más profundo: arquitectura real del código, funcionalidades verificadas contra el código fuente, riesgos detectados (incluyendo seguridad) y una hoja de ruta priorizada. El README debe seguir siendo la referencia rápida de arranque; este documento es la referencia de análisis y decisiones técnicas.
+Este documento es la referencia técnica detallada del estado actual. El [README raíz](../README.md) contiene la guía rápida de instalación y uso; este análisis recoge arquitectura, inventario funcional, modelo de datos, decisiones recientes, riesgos y roadmap.
 
 ## Índice
 
-1. Resumen del estado del proyecto
+1. Estado actual
 2. Arquitectura y flujo de datos
-3. Inventario funcional por módulo (backend)
-4. Frontend: rutas, guardas y servicios
-5. Modelo de datos (Prisma)
-6. Seguridad: estado actual y huecos
-7. Calidad, tests y automatización
-8. Riesgos detectados (priorizados)
-9. Próximos pasos recomendados (roadmap)
+3. Inventario funcional
+4. Frontend y rutas
+5. Modelo de datos
+6. Decisiones recientes
+7. Seguridad y operación
+8. Calidad y pruebas
+9. Riesgos y pendientes
+10. Roadmap
 
----
+## 1. Estado actual
 
-## 1. Resumen del estado del proyecto
+AthLyzer Sports Train es una aplicación web para gestión deportiva con autenticación, equipos, temporadas, jugadores, plantillas y evaluación antropométrica ISAK.
 
-AthLyzer Sports Train es una aplicación de gestión deportiva (usuarios, roles, categorías, equipos, jugadores, temporadas) compuesta por:
+### Implementado
 
-- **Backend**: NestJS 12 + Prisma 6 + PostgreSQL, autenticación JWT, autorización por roles, CORS restringido a Vite en desarrollo, filtro global de excepciones, y (desde 2026-09-18) DTOs con `class-validator` + `ValidationPipe` global para los módulos de equipos y jugadores.
-- **Frontend**: React + Vite + React Router + Tailwind CSS, sin gestor de estado global (todo vive en `localStorage` + fetch directo por componente/servicio).
-- **Orquestación**: scripts raíz (`npm start`) que limpian puertos, resetean el cliente Prisma y levantan backend y frontend en paralelo con `concurrently` + `wait-on`.
+- Backend NestJS 12, Prisma 6 y PostgreSQL.
+- Frontend React, Vite, TypeScript, React Router y Tailwind CSS.
+- Login con bcrypt y JWT.
+- Autorización backend mediante `JwtAuthGuard`, `RolesGuard` y `@Roles`.
+- DTOs con `class-validator`, `PartialType` y `ValidationPipe` global.
+- CRUD de categorías, equipos, jugadores, temporadas y usuarios.
+- Gestión de plantillas jugador-equipo con baja lógica y operaciones en bloque.
+- Ficha ampliada de jugador con datos personales, equipos, lesiones y mediciones recientes.
+- Doble clic, teclado y botón visible para abrir una ficha desde el listado de jugadores.
+- Subida de fotografías para administradores, con almacenamiento local de archivos y ruta persistida en BD.
+- Stepper antropométrico ISAK de cuatro pasos con historial, cálculos reactivos y somatocarta.
+- API antropométrica con auditoría del evaluador y cálculos derivados persistidos en servidor.
+- Throttling global y límite específico para login.
 
-El proyecto está en una fase de "MVP funcional con endurecimiento parcial": los flujos CRUD principales existen y funcionan, la autenticación/autorización backend es sólida, pero la validación de entrada y la cobertura de tests son desiguales entre módulos (equipos/jugadores ya reforzados; categorías, usuarios, temporadas y login todavía no).
+### No implementado todavía
+
+- CRUD y pantallas para lesiones.
+- Relación de jugador con posición.
+- Cálculo validado de masa muscular con las variables necesarias.
+- Tests automatizados de frontend.
+- CI/CD y cabeceras HTTP adicionales como Helmet.
 
 ## 2. Arquitectura y flujo de datos
 
 ```text
-React (Vite, puerto 5173)
-  │  fetch + Authorization: Bearer <JWT>
-  ▼
-NestJS (puerto 3000, prefijo global /api)
-  │  JwtAuthGuard -> RolesGuard -> ValidationPipe (global) -> Controller -> Service
-  ▼
-Prisma Client
-  ▼
-PostgreSQL
+React + Vite :5173
+  | fetch + Authorization: Bearer JWT
+  v
+NestJS :3000/api
+  | JwtAuthGuard -> RolesGuard -> ValidationPipe
+  v
+Controllers -> Services -> PrismaService -> PostgreSQL
 ```
 
-Puntos de diseño relevantes:
+El backend sirve además `/uploads/...` como recursos estáticos. En desarrollo CORS permite los orígenes locales de Vite; en producción debe configurarse explícitamente el origen permitido.
 
-- El prefijo `/api` se fija en `backend/src/main.ts`; cualquier ruta nueva debe registrarse bajo un controlador de Nest para heredarlo automáticamente.
-- CORS solo se habilita cuando `NODE_ENV !== 'production'`, restringido a orígenes de `localhost`/`127.0.0.1`/`[::1]`/`192.168.x.x` en el puerto 5173. **En producción no hay configuración de CORS explícita**, lo que en la práctica bloquea cualquier origen cross-origin salvo que se añada configuración adicional antes de desplegar.
-- El seed de usuarios demo (`auth.seed.ts`) se ejecuta en cada arranque del backend (`main.ts`), no solo en desarrollo; el propio seed decide internamente si crea/actualiza usuarios según `NODE_ENV` y variables `DEMO_*`.
-- No existe capa de caché, cola de trabajos ni servicios externos: la arquitectura es monolítica de 2 capas (API + BD) más un frontend SPA.
+El arranque raíz es:
 
-## 3. Inventario funcional por módulo (backend)
+```text
+npm start
+  -> cleanup-ports.js
+  -> reset-prisma-client.js
+  -> backend start:dev
+  -> wait-on http://localhost:3000/api
+  -> frontend dev :5173
+```
 
-| Módulo | Guardas | Validación de entrada | Reglas de negocio relevantes |
+`reset-prisma-client.js` ejecuta el CLI JavaScript local de Prisma mediante `process.execPath`. Esto evita el bloqueo observado con `npx` y rutas Windows con espacios.
+
+## 3. Inventario funcional
+
+| Módulo | Backend | Frontend | Roles principales |
 |---|---|---|---|
-| `auth` | Público (`/login`) | `LoginDto` (class-validator: `IsEmail`, `IsNotEmpty`) + `ValidationPipe` global | Compara bcrypt, exige `activo = true`, firma JWT con `id_usuario`, `email`, `role` |
-| `equipos` | `JwtAuthGuard` + `RolesGuard` (`GET` cualquier rol, mutaciones `admin`) | `CreateEquipoDto` / `UpdateEquipoDto` (class-validator) + `ValidationPipe` global | Requiere `id_temporada` existente; si se informa `id_categoria` debe existir y estar activa |
-| `jugadores` | `JwtAuthGuard` + `RolesGuard` (igual patrón) | `CreateJugadorDto` / `UpdateJugadorDto` (class-validator) | DNI único (constraint de BD, mapeado a 409 por el filtro global) |
-| `categorias` | `JwtAuthGuard` + `RolesGuard`, **todo el controlador exige `admin`** (incluidos los `GET`) | `CreateCategoriaDto` / `UpdateCategoriaDto` (class-validator) | No permite borrar una categoría con equipos asociados (`_count.equipos > 0`) |
-| `usuarios` | `JwtAuthGuard` + `RolesGuard`, **todo el controlador exige `admin`** | `CreateUsuarioDto` / `UpdateUsuarioDto` (class-validator) | Hash bcrypt (12 rounds) en alta/edición de password; expone `GET /roles` |
-| `temporadas` | `JwtAuthGuard` + `RolesGuard` (igual patrón que equipos) | `CreateTemporadaDto` / `UpdateTemporadaDto` (class-validator) | Valida que `fecha_fin >= fecha_inicio` |
+| Auth | Login, bcrypt, JWT, seed demo | Login y persistencia de sesión | Público para login |
+| Usuarios | CRUD y roles | Administración | `admin` |
+| Categorías | CRUD y protección de borrado | CRUD | `admin` |
+| Temporadas | CRUD y validación de fechas | CRUD | Lectura autenticada, mutación `admin` |
+| Equipos | CRUD por temporada/categoría | CRUD y navegación a plantilla | Lectura autenticada, mutación `admin` |
+| Jugadores | CRUD, detalle relacional y foto | Listado, CRUD y ficha | Lectura autenticada, mutación `admin` |
+| Jugador-equipo | Asignación individual/en bloque y baja lógica | Dual listbox | Lectura autenticada, mutación `admin` |
+| Antropometría | Crear, historial por jugador y cálculo | Stepper ISAK y somatocarta | `admin`, `usuario` |
+| Lesiones | Solo modelo Prisma | Sin pantalla | Pendiente |
+| Posiciones | Solo modelo Prisma, sin FK a jugador | Sin pantalla | Pendiente |
 
-Observación importante: **`categorias` y `usuarios` restringen incluso la lectura (`GET`) a rol `admin`**, a diferencia de `equipos`, `jugadores` y `temporadas`, donde cualquier usuario autenticado puede leer. Esto es una decisión de negocio implícita en el código (no documentada explícitamente en el README) que conviene confirmar que es intencional.
+### Ficha de jugador
 
-> Actualizado 2026-09-18: todos los módulos (`auth`, `equipos`, `jugadores`, `categorias`, `usuarios`, `temporadas`) usan ya DTOs con `class-validator` y el `ValidationPipe` global; ya no queda ningún controlador/servicio recibiendo `data: any`.
+`GET /api/jugadores/:id` devuelve el jugador junto con:
 
-> Actualizado 2026-09-18 (2ª vez): nuevo módulo `jugador-equipo` (`/api/equipos/:idEquipo/plantilla`) para gestionar la relación jugador↔equipo mediante altas/bajas lógicas sobre la tabla `jugador_equipo` (individuales y en bloque). Lectura abierta a cualquier rol autenticado, mutaciones restringidas a `admin`, mismo patrón que `equipos`/`jugadores`/`temporadas`.
+- `jugador_equipo`, incluyendo equipo, categoría y temporada, ordenado por inicio.
+- `lesion`, ordenadas por fecha de inicio.
+- Cinco `medicion_antropometrica` recientes, incluyendo el nombre del evaluador.
 
-## 4. Frontend: rutas, guardas y servicios
+La ruta frontend `/jugadores/:id` presenta datos personales, edad calculada, situación deportiva, historial de equipos, evolución antropométrica, estado médico y acciones de edición, medición y fotografía.
 
-- El enrutado (`frontend/src/router.tsx`) usa dos guardas: `RequireAuth` (cualquier usuario con `accessToken` válido en `localStorage`) y `RequireAdmin` (además exige `role === 'admin'`, si no redirige a `/dashboard`).
-- Las rutas de `categorias` y `usuarios` usan `RequireAdmin` en frontend, coherente con la restricción de rol `admin` que exige el backend en esos módulos.
-- Las rutas de `equipos`, `jugadores` y `temporadas` solo usan `RequireAuth` (cualquier rol autenticado), también coherente con el backend, aunque los formularios de creación/edición/borrado en frontend no ocultan ni deshabilitan la UI según el rol: si un usuario no-admin navega directamente a `/equipos/crear`, el backend rechazará el `POST` con 403, pero el formulario se renderiza igualmente.
-- `frontend/src/main.tsx` no usa `App.tsx` (el archivo existe pero está vacío); el punto de entrada real es `Router` renderizado directamente.
-- `auth.service.ts` apunta a `http://localhost:3000/api/auth` **hardcodeado**, sin variable de entorno (`VITE_API_URL` o similar). Esto es un riesgo de despliegue: cualquier entorno que no sea `localhost:3000` requiere editar código fuente.
-- Los `package.json` de frontend usan `"latest"` para React, Vite, React Router, TypeScript, etc., en lugar de rangos semánticos fijos. Esto facilita quedar desalineado entre entornos/instalaciones (`npm install` en dos máquinas distintas en días distintos puede traer versiones diferentes).
+### Fotografía
 
-## 5. Modelo de datos (Prisma)
+La fotografía no se almacena como `BYTEA` ni como base64 en PostgreSQL. El endpoint `POST /api/jugadores/:id/foto` recibe `multipart/form-data`:
 
-Modelos definidos en `backend/prisma/schema.prisma`: `rol`, `usuario`, `categoria`, `temporada`, `equipo`, `jugador`, `jugador_equipo`, `lesion`, `medicion_antropometrica`, `posicion`.
+- Campo: `foto`.
+- Roles: `admin`.
+- Tipos: JPEG, PNG y WebP.
+- Tamaño máximo: 5 MB.
+- Ubicación local: `backend/uploads/jugadores/`.
+- Valor persistido en `jugador.foto`: `/uploads/jugadores/<uuid>.<ext>`.
 
-Puntos relevantes:
+El directorio está en `.gitignore`. El servicio elimina la foto local anterior cuando se reemplaza o elimina el jugador. Para producción se recomienda sustituir el almacenamiento local por Blob Storage, S3 o CDN y conservar la misma idea de guardar únicamente una URL.
 
-- `equipo.id_temporada` usa `onDelete: Cascade` hacia `temporada` a nivel de base de datos: si se borrase una temporada directamente en BD (fuera de la API), se borrarían en cascada sus equipos y, transitivamente, `jugador_equipo`. Desde la API esto ya no es alcanzable: `TemporadasService.remove()` comprueba `_count.equipo` y rechaza el borrado con `400` si hay equipos asociados (mismo patrón que `categorias`).
-- `equipo.id_categoria` usa `onDelete: Restrict`: coherente con la regla de negocio en `categorias.service.ts` que impide borrar categorías con equipos asociados.
-- `jugador.dni` es único a nivel de BD; el filtro global (`GlobalExceptionFilter`) traduce el error `P2002` de Prisma en un 409 con mensaje legible, pero no hay una validación previa (`class-validator` o consulta) que dé un mensaje más amigable antes de tocar la BD.
-- Modelos `lesion`, `medicion_antropometrica` y `posicion` **existen en el esquema y en las migraciones pero no tienen módulo, servicio, controlador ni pantalla en frontend**. Son funcionalidad modelada pero no implementada todavía.
-- `jugador_equipo` ya tiene un módulo dedicado (2026-09-18, ver sección 3) que gestiona el alta/baja de jugadores en un equipo mediante borrado lógico (`activo`, `fecha_inicio`, `fecha_fin`), preservando el histórico en vez de borrar filas. La tabla `posicion` sigue sin relación con `jugador` en el esquema, por lo que no es posible filtrar jugadores por posición sin ampliar el modelo de datos (limitación conocida de la nueva pantalla de plantilla).
+### Antropometría ISAK
 
-## 6. Seguridad: estado actual y huecos
+El stepper frontend envía medidas brutas en una única petición `POST /api/mediciones-antropometricas`. El servidor calcula:
 
-Lo que ya está bien resuelto:
+- Sumatoria de seis pliegues.
+- Sumatoria de ocho pliegues si existen bicipital y cresta ilíaca.
+- Porcentaje de grasa mediante la ecuación de Faulkner usada por el proyecto.
+- Endomorfia y ectomorfia Heath-Carter.
+- Mesomorfia y coordenadas de somatocarta cuando están las medidas requeridas.
 
-- Passwords con bcrypt (12 rounds), nunca en texto plano.
-- JWT firmado con secreto configurable (`JWT_SECRET`), con fallback de desarrollo (`DEV_JWT_SECRET`) que **lanza error si `NODE_ENV=production` y no hay `JWT_SECRET`** (buen diseño, evita despliegues inseguros por omisión).
-- Autorización real en backend (`JwtAuthGuard` + `RolesGuard`), no solo en frontend.
-- DTOs + `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transform`) ya activos para equipos y jugadores.
+El evaluador se obtiene del JWT (`request.user.id_usuario`) y no se acepta desde el cliente. El historial se consulta con `GET /api/mediciones-antropometricas/jugador/:idJugador` y se ordena por fecha descendente.
 
-Huecos detectados:
+## 4. Frontend y rutas
 
-- ~~Sin rate limiting en `POST /api/auth/login`~~ Resuelto 2026-09-18: `@nestjs/throttler` registrado globalmente (`ThrottlerGuard` como `APP_GUARD`, 100 peticiones/minuto por IP) y con un límite reforzado de 5 intentos/minuto en el login (`@Throttle`).
-- ~~Sin DTO/validación estructurada en `auth.controller.ts`~~ Resuelto 2026-09-18: `LoginDto` con `class-validator` (`IsEmail`, `IsNotEmpty`) ya valida el body de login antes de llegar al servicio.
-- ~~`categorias`, `usuarios` y `temporadas` siguen con `data: any`~~ Resuelto 2026-09-18: los tres módulos ya usan DTOs de creación/actualización con `class-validator`, en línea con `equipos`/`jugadores`.
-- **Token en `localStorage`**: ya documentado como riesgo conocido en el README; sigue vigente (vulnerable a robo por XSS si en el futuro se introduce contenido no confiable).
-- **Sin CSP ni cabeceras de seguridad HTTP** (`helmet` no está instalado): no hay protección adicional contra XSS/clickjacking a nivel de cabeceras HTTP en el backend.
-- **CORS no configurado para producción**: si se despliega, habrá que decidir y codificar explícitamente los orígenes permitidos en producción (actualmente el bloque de `enableCors` solo se ejecuta fuera de producción).
-- **Sin límite de tamaño de payload ni sanitización adicional** más allá de lo que Express/Nest traen por defecto.
-- **`npm audit` con vulnerabilidades pendientes** (ya señalado en README): no se ha revisado el detalle de severidad/CVE por paquete todavía.
+Las rutas privadas se renderizan dentro de `Layout`, que contiene sidebar, header y área de trabajo. `RequireAuth` exige token; `RequireAdmin` exige rol `admin`; `RequireEvaluator` permite `admin` y `usuario` para la creación antropométrica.
 
-## 7. Calidad, tests y automatización
+Rutas relevantes:
 
-- Lint: `oxlint` en backend, con la regla `@typescript-eslint/no-explicit-any` **desactivada explícitamente** (`backend/oxlint.json`). Esto significa que el lint no detecta ni impedirá que se sigan añadiendo `data: any` en los módulos pendientes; el criterio para eliminarlos depende de disciplina manual o de una futura reactivación de esa regla.
-- Tests unitarios (`npm run test`, Vitest): 20 tests. 2 en `app.controller.spec.ts`, 12 en specs de servicio de `categorias`/`temporadas`/`usuarios`/`jugadores`, y 6 nuevos (2026-09-18) en `jugador-equipo.service.spec.ts` (equipo inexistente, exclusión de disponibles ya activos, reactivación de relación inactiva en vez de duplicarla, jugador inexistente, quitar un jugador no activo, soft-delete al quitar).
-- Tests e2e (`npm run test:e2e`, Vitest + Supertest):
-  - `test/app.e2e-spec.ts`: histórico, requiere una PostgreSQL real conectada vía `DATABASE_URL` (falla en entornos sin BD, incluido el entorno de este análisis).
-  - `test/protected-endpoints.e2e-spec.ts` (2026-09-18): 30 tests organizados en 5 bloques independientes (equipos/usuarios, `auth.login` casos de negocio, categorias, jugadores, temporadas), cada uno con su propia instancia de la app y `PrismaService` mockeado (no requiere BD real). Cubre 401/403/400/200/201 por módulo, 429 de rate limiting en login, y los tres casos de negocio de login (usuario inexistente 404, usuario inactivo 400, password incorrecta 400).
-  - No hay tests e2e todavia para categorias/usuarios/jugadores/temporadas más alla de los casos JWT/roles ya cubiertos; ver más abajo los tests unitarios de servicio que ya cubren las reglas de negocio más finas (borrado en cascada, unicidad).
-- Frontend: no hay tests automatizados (ni unitarios ni e2e/UI) configurados en `frontend/package.json`.
-- No hay pipeline de CI configurado en el repositorio (no se detectó carpeta `.github/workflows` ni configuración equivalente): las validaciones (`build`, `test`, `lint`) se ejecutan manualmente.
+```text
+/login
+/dashboard
+/admin
+/categorias...
+/usuarios...
+/equipos...
+/equipos/plantilla/:id
+/jugadores
+/jugadores/:id
+/jugadores/crear
+/jugadores/editar/:id
+/jugadores/borrar/:id
+/mediciones-antropometricas/crear
+/temporadas...
+```
 
-## 8. Riesgos detectados (priorizados)
+Los servicios frontend usan `authHeaders()` y mantienen actualmente la URL de API `http://localhost:3000/api` en código. Esto sigue siendo una limitación para despliegue fuera del entorno local.
 
-**Alto**
+## 5. Modelo de datos
 
-1. Ausencia de CI: nada impide subir código que rompe `build`/`test`/`lint` a la rama principal.
-2. ~~`POST /api/auth/login` sin rate limiting ni DTO validado~~ Resuelto 2026-09-18: `LoginDto` + `@nestjs/throttler` (5 intentos/minuto) ya mitigan payloads malformados y fuerza bruta.
-3. ~~Falta de tests de integración para `categorias`, `usuarios`, `temporadas` y `auth`~~ Resuelto 2026-09-18: `protected-endpoints.e2e-spec.ts` cubre ahora JWT/roles, DTOs y casos de negocio de login para los 5 módulos, y los tests unitarios de servicio cubren además borrado en cascada y unicidad (ver punto 7).
+El esquema Prisma contiene:
 
-**Medio**
+- `rol` y `usuario`: autenticación, autorización y auditoría.
+- `categoria`, `temporada` y `equipo`: organización deportiva.
+- `jugador`: identidad deportiva, foto como ruta y relaciones.
+- `jugador_equipo`: pertenencia histórica, dorsal y estado activo.
+- `lesion`: información médica básica.
+- `medicion_antropometrica`: protocolo ISAK y resultados derivados.
+- `posicion`: catálogo todavía no relacionado con jugador.
 
-4. ~~`data: any` persistente en `categorias`, `usuarios`, `temporadas`~~ Resuelto 2026-09-18 (DTOs + class-validator ya aplicados en los tres módulos, más `auth`).
-5. ~~`onDelete: Cascade` de `temporada -> equipo` sin confirmación ni aviso en la capa de aplicación~~ Resuelto 2026-09-18: `TemporadasService.remove()` ahora comprueba equipos asociados y rechaza el borrado con `400` (mismo patrón que `categorias`), en vez de dejar que la cascada de BD actúe en silencio a través de la API.
-6. URL de API hardcodeada en el frontend (`http://localhost:3000/api/auth` y previsiblemente en el resto de servicios): bloquea el despliegue a otro dominio/puerto sin tocar código.
-7. Dependencias `"latest"` en `frontend/package.json`: riesgo de builds no reproducibles entre máquinas/tiempos distintos.
-8. Vulnerabilidades reportadas por `npm audit` sin triaje documentado (ni en backend ni en frontend).
+La migración `20260922120000_mediciones_antropometricas_isak` transforma el modelo antropométrico inicial. Se detiene si encuentra registros previos porque faltan datos obligatorios del nuevo protocolo y no es seguro inventar pliegues ni evaluador.
 
-**Bajo**
+Migraciones:
 
-9. Regla de lint `no-explicit-any` desactivada: no hay barrera automática que impida reintroducir `any` en el futuro.
-10. `App.tsx` vacío y sin uso: código muerto que puede confundir a nuevas personas del equipo.
-11. Modelos `lesion`, `medicion_antropometrica`, `posicion` sin ninguna implementación (ni API ni UI): expectativa funcional del dominio (deportivo/médico) todavía no cubierta.
-12. Sin cabeceras de seguridad HTTP (`helmet`) ni límites de tamaño de payload explícitos.
+```text
+20260910140914_init
+20260910141245_init
+20260914110403_auth_roles_users
+20260916090000_categorias_equipos
+20260922120000_mediciones_antropometricas_isak
+```
 
-## 9. Próximos pasos recomendados (roadmap)
+## 6. Decisiones recientes
 
-Orden sugerido, de mayor a menor impacto/menor esfuerzo:
+### Auditoría antropométrica
 
-1. ~~Extender DTOs + `class-validator` a `auth` (login), `categorias`, `usuarios` y `temporadas`~~ **Completado 2026-09-18**, siguiendo el patrón ya validado en `equipos`/`jugadores` (DTO de creación + `PartialType` para actualización).
-2. ~~Añadir rate limiting básico al login~~ **Completado 2026-09-18**: `@nestjs/throttler` con límite global (100/min) y límite reforzado en login (5/min).
-3. ~~Ampliar `protected-endpoints.e2e-spec.ts` para cubrir `categorias`, `jugadores`, `temporadas` y `auth.login`~~ **Completado 2026-09-18**: 30 tests en 5 bloques independientes.
-4. ~~Añadir tests unitarios de servicio para las reglas de negocio más sensibles~~ **Completado 2026-09-18**: `categorias.service.spec.ts`, `temporadas.service.spec.ts`, `usuarios.service.spec.ts` y `jugadores.service.spec.ts` (12 tests) cubren no-borrado de categoría con equipos, el riesgo de cascada en `temporadas.remove()`, y la propagación del error `P2002` de Prisma para unicidad de email/DNI.
-5. ~~Impedir el borrado en cascada silencioso de `temporada -> equipo`~~ **Completado 2026-09-18**: `TemporadasService.remove()` rechaza con `400` si la temporada tiene equipos asociados, en vez de dejar que Prisma/BD borre en cascada sin aviso.
-6. **Configurar CI** (build + test + lint de backend y build de frontend) en cada PR/push a la rama principal.
-7. **Externalizar la URL de la API en frontend** (variable de entorno de Vite, p. ej. `VITE_API_URL`), en vez de hardcodear `localhost:3000`.
-8. **Revisar y fijar versiones** en `frontend/package.json` (sustituir `"latest"` por rangos semánticos concretos) y ejecutar `npm audit` en ambas carpetas, documentando el triaje de cada hallazgo.
-9. **Decidir y documentar explícitamente** si la restricción de `GET` a rol `admin` en `categorias` y `usuarios` es intencional (y dejarlo reflejado en el README/documentación de API), o alinearla con el patrón de `equipos`/`jugadores`/`temporadas` si no lo es.
-10. **Planificar la implementación de `lesion`, `medicion_antropometrica` y `posicion`** (API + UI) si siguen siendo parte del alcance funcional del producto, o retirarlos del esquema si se han descartado.
-11. **Añadir `helmet` y límites de tamaño de payload** en el backend como capa adicional de seguridad HTTP.
+`id_evaluador` es una relación obligatoria con `usuario`. El controlador ignora cualquier intento de enviar ese identificador desde el frontend y usa el usuario autenticado. Esto evita atribuir una medición a otra persona manipulando el body.
+
+### Cálculos en servidor
+
+El frontend muestra una previsualización reactiva para mejorar la experiencia, pero los valores definitivos se recalculan en `antropometria.calculator.ts` dentro del backend antes de persistirlos. Así el historial no depende de la implementación concreta del navegador.
+
+### Foto por referencia
+
+La BD mantiene una referencia ligera y reemplazable. Guardar binarios en PostgreSQL habría aumentado el tamaño de las respuestas de detalle y habría acoplado la aplicación al almacenamiento de la base de datos.
+
+### Datos antiguos antropométricos
+
+La migración no intenta convertir mediciones incompletas. Si una base contiene datos antiguos, debe respaldarse y definirse una estrategia de normalización antes de aplicar la migración ISAK.
+
+## 7. Seguridad y operación
+
+Resuelto:
+
+- Passwords con bcrypt.
+- JWT con secreto configurable y validación de configuración productiva.
+- Guards de autenticación y roles en backend.
+- Validación y rechazo de propiedades no declaradas.
+- Rate limiting global y reforzado para login.
+- Límite de tamaño y filtro MIME para fotografías.
+- Los archivos de usuario no se versionan.
+
+Pendiente:
+
+- El JWT se guarda en `localStorage`; valorar cookies HttpOnly en producción.
+- Añadir Helmet y cabeceras CSP/clickjacking.
+- Externalizar `VITE_API_URL`.
+- Revisar las vulnerabilidades de `npm audit` antes de desplegar.
+- Añadir control de acceso más fino si lesiones o mediciones requieren confidencialidad diferenciada.
+
+## 8. Calidad y pruebas
+
+Validación de referencia del 2026-09-23:
+
+```text
+Backend build: correcto
+Backend test: 25 tests correctos en 8 archivos
+Backend lint: correcto
+Frontend build: correcto
+```
+
+Las pruebas unitarias recientes cubren:
+
+- Cálculos de sumatorias, grasa y somatotipo.
+- Omisión segura de cálculos que dependen de opcionales ausentes.
+- Persistencia del evaluador autenticado.
+- Rechazo de jugador inexistente al crear una medición.
+- Includes y ordenación de la ficha ampliada.
+- Reglas de negocio previas de categorías, temporadas, usuarios, jugadores y plantillas.
+
+Los tests e2e protegidos mockean Prisma y cubren autenticación, roles, DTOs y login. El e2e histórico de la aplicación requiere PostgreSQL real.
+
+No hay todavía tests automatizados de componentes o flujos del frontend; la revisión visual de la ficha y el stepper se realiza manualmente en `http://localhost:5173`.
+
+## 9. Riesgos y pendientes
+
+1. No hay CI que ejecute build, tests y lint en cada cambio.
+2. Las URLs de API están hardcodeadas para localhost.
+3. El almacenamiento local de fotografías no es adecuado para varias réplicas del backend.
+4. No hay CRUD de lesiones.
+5. `posicion` no está relacionada con `jugador`.
+6. La masa muscular no se persiste porque falta una fórmula y variables validadas.
+7. Persisten riesgos de `localStorage`, falta de Helmet y dependencias con rangos `latest` en frontend.
+8. No hay tests frontend automatizados.
+
+## 10. Roadmap
+
+1. Externalizar configuración de API y fijar versiones frontend.
+2. Añadir CI con backend build/test/lint y frontend build.
+3. Migrar fotografías a almacenamiento de objetos/CDN.
+4. Implementar CRUD y permisos de lesiones.
+5. Modelar la relación jugador-posición.
+6. Definir y validar el cálculo de masa muscular con el equipo deportivo.
+7. Añadir tests de integración frontend y flujos Playwright.
+8. Incorporar Helmet, CSP, cookies HttpOnly y política de CORS productiva.

@@ -1,6 +1,6 @@
 # AthLyzer Sports Train
 
-Documentacion de estado del proyecto a fecha 2026-09-18. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
+Documentacion de estado del proyecto a fecha 2026-09-23. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
 
 > Para un analisis tecnico mas detallado (arquitectura, inventario funcional modulo a modulo, riesgos priorizados y roadmap), ver [docs/ANALISIS-PROYECTO.md](docs/ANALISIS-PROYECTO.md).
 
@@ -20,6 +20,9 @@ Estado actual:
 - Validacion de entrada con DTOs (`class-validator`) y `ValidationPipe` global en todos los endpoints (auth, equipos, jugadores, categorías, usuarios, temporadas).
 - Rate limiting con `@nestjs/throttler`: limite global de 100 peticiones/minuto por IP y limite reforzado de 5 intentos/minuto en `POST /api/auth/login`.
 - Gestion de plantillas de equipo (asignar/quitar jugadores) mediante una pantalla de tipo "dual listbox" (jugadores disponibles vs. plantilla del equipo), con soporte de selección multiple y acciones en bloque.
+- Ficha ampliada de jugador en `/jugadores/:id`, con acceso por doble clic sobre la card, teclado o boton visible.
+- Subida de fotografia de jugador para administradores; el archivo se almacena fuera de PostgreSQL y la BD conserva solo su ruta publica.
+- Flujo antropometrico ISAK en un stepper de cuatro pasos, con historial previo, calculos reactivos, somatocarta, persistencia y auditoria del evaluador.
 - Tests de integracion (e2e) que cubren JWT/roles y rate limiting en endpoints protegidos: sin token, token invalido, rol no admin, rol admin y bloqueo por exceso de intentos de login, extendidos a equipos, jugadores, categorias, usuarios, temporadas y a los distintos casos de negocio de `auth.login`.
 - Frontend con rutas privadas: si no hay usuario logado con token, redirige a `/login`.
 - UI unificada alrededor de componentes `Card`, `Button`, `LinkButton`, `FormInput`, `FormSelect` y `FormTextarea`.
@@ -84,6 +87,8 @@ El script raiz `npm start` hace lo siguiente:
 3. Levanta el backend con `npm --prefix ./backend run start:dev`.
 4. Espera a que el backend responda en `http://localhost:3000/api`.
 5. Levanta el frontend con `npm --prefix ./frontend run dev`.
+
+`npm run prisma:reset` invoca el CLI JavaScript local de Prisma mediante Node, evitando problemas de `npx` y de rutas Windows con espacios. No debe ejecutarse otra instancia mientras los puertos 3000 o 5173 esten ocupados; `npm run cleanup` intenta liberar ambos puertos.
 
 Scripts raiz disponibles:
 
@@ -320,6 +325,7 @@ GET    /api/jugadores/:id
 POST   /api/jugadores      admin
 PUT    /api/jugadores/:id  admin
 DELETE /api/jugadores/:id  admin
+POST   /api/jugadores/:id/foto admin  # multipart field `foto`, JPEG/PNG/WebP, max. 5 MB
 
 GET    /api/temporadas
 GET    /api/temporadas/:id
@@ -333,6 +339,9 @@ POST   /api/equipos/:idEquipo/plantilla                 admin  # asigna un jugad
 POST   /api/equipos/:idEquipo/plantilla/bulk-assign     admin  # asigna varios { id_jugadores: number[] }
 POST   /api/equipos/:idEquipo/plantilla/bulk-remove     admin  # quita varios { id_jugadores: number[] }
 DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin  # quita un jugador
+
+GET    /api/mediciones-antropometricas/jugador/:idJugador  admin, usuario
+POST   /api/mediciones-antropometricas                       admin, usuario
 ```
 
 ## Validacion de Datos (DTOs)
@@ -381,7 +390,7 @@ Modelos definidos actualmente:
 - `jugador`: jugadores con DNI, nombre, apellidos, fecha de nacimiento y foto.
 - `jugador_equipo`: relacion jugador-equipo con fechas, dorsal y estado activo.
 - `lesion`: lesiones de jugadores.
-- `medicion_antropometrica`: mediciones fisicas por jugador.
+- `medicion_antropometrica`: protocolo ISAK completo, resultados calculados, somatotipo, somatocarta, observaciones, evaluador y marcas de auditoria.
 - `posicion`: posiciones deportivas.
 
 Migraciones Prisma existentes:
@@ -392,6 +401,7 @@ backend/prisma/migrations/
 	20260910141245_init/
 	20260914110403_auth_roles_users/
 	20260916090000_categorias_equipos/
+	20260922120000_mediciones_antropometricas_isak/
 ```
 
 ## Frontend
@@ -431,6 +441,7 @@ frontend/src/
 		ui/
 		equipos/
 		jugadores/
+		mediciones-antropometricas/
 		temporadas/
 ```
 
@@ -470,6 +481,8 @@ Rutas actuales:
 /jugadores/crear
 /jugadores/editar/:id
 /jugadores/borrar/:id
+/jugadores/:id
+/mediciones-antropometricas/crear
 /temporadas
 /temporadas/crear
 /temporadas/editar/:id
@@ -484,7 +497,8 @@ Los servicios estan en `frontend/src/components/services/`.
 - `categorias.service.ts`: llamadas a `/api/categorias` y `/api/categorias/activas`.
 - `usuarios.service.ts`: llamadas a `/api/usuarios` y `/api/usuarios/roles`.
 - `equipos.service.ts`: llamadas a `/api/equipos`.
-- `jugadores.service.ts`: llamadas a `/api/jugadores`.
+- `jugadores.service.ts`: llamadas a `/api/jugadores`, detalle ampliado y subida de foto.
+- `medicionesAntropometricas.service.ts`: historial y creación de mediciones ISAK.
 - `temporadas.service.ts`: llamadas a `/api/temporadas`.
 
 Los servicios CRUD adjuntan `Authorization: Bearer ...` usando el token guardado en `localStorage`.
@@ -523,7 +537,10 @@ Pantallas ya alineadas con este sistema:
 - Listas de equipos, jugadores y temporadas.
 - Crear, editar y borrar equipos.
 - Crear, editar y borrar jugadores.
+- Ficha ampliada de jugador con doble clic, teclado o boton visible.
+- Subida de foto desde la ficha para administradores; JPEG, PNG y WebP hasta 5 MB.
 - Crear, editar y borrar temporadas.
+- Stepper antropometrico de cuatro pasos: contexto, pliegues, perimetros/diametros y revision final.
 
 ## Validacion Ejecutada
 
@@ -542,7 +559,7 @@ npm run build
 Resultado conocido:
 
 - Backend build: correcto.
-- Backend tests: correcto, 14 tests pasan (2 de `app.controller.spec.ts` + 12 de tests unitarios de servicio en `categorias`, `temporadas`, `usuarios` y `jugadores`).
+- Backend tests: correcto, 25 tests pasan en 8 archivos, incluyendo calculos ISAK, auditoria del evaluador y detalle ampliado de jugador.
 - Backend lint: correcto.
 - Frontend build: correcto.
 
@@ -608,6 +625,41 @@ Limitacion conocida: el filtro de disponibles solo es por texto (nombre/apellido
 
 Aviso no bloqueante observado: Vitest muestra una recomendacion relacionada con `vite-tsconfig-paths`, indicando que Vite ya soporta resolucion nativa de paths mediante `resolve.tsconfigPaths`.
 
+## Ficha Ampliada de Jugador
+
+Desde `/jugadores`, una card se puede abrir con doble clic, con la tecla `Enter` cuando tiene el foco o mediante el boton `Ficha`. La pantalla `/jugadores/:id` muestra en una sola vista:
+
+- Datos personales, DNI, fecha de nacimiento, edad y estado deportivo.
+- Equipo o equipos activos, dorsal, categoría y temporada.
+- Histórico de equipos con fechas de pertenencia.
+- Última medición antropométrica y hasta cuatro mediciones anteriores.
+- Lesiones registradas y número de lesiones activas.
+
+El endpoint `GET /api/jugadores/:id` carga estas relaciones en una sola consulta Prisma, ordena equipos y lesiones por fecha y limita a cinco las mediciones más recientes.
+
+### Fotografías
+
+La columna `jugador.foto` almacena una URL o ruta, no el binario de la imagen. La subida se realiza con `POST /api/jugadores/:id/foto` usando `multipart/form-data` y el campo `foto`:
+
+- Solo disponible para administradores.
+- Acepta JPEG, PNG y WebP.
+- Limite de 5 MB por archivo.
+- Los archivos locales se guardan en `backend/uploads/jugadores/`, servido como `/uploads/jugadores/...` y excluido de Git.
+- Al sustituir o eliminar un jugador, se intenta eliminar el archivo local anterior.
+
+En producción, el mismo contrato puede conectarse a almacenamiento de objetos o CDN guardando en `jugador.foto` únicamente la URL resultante.
+
+## Mediciones Antropométricas ISAK
+
+La ruta `/mediciones-antropometricas/crear` está disponible para roles `admin` y `usuario`. El formulario se organiza en cuatro pasos:
+
+1. Contexto y datos básicos: jugador, fecha, peso, talla y talla sentado; muestra IMC, último peso y variación.
+2. Pliegues cutáneos: seis campos obligatorios y dos opcionales; actualiza sumatorias y porcentaje de grasa mientras se escribe y avisa valores superiores a 35 mm.
+3. Perímetros y diámetros: medidas ISAK opcionales y observaciones.
+4. Revisión: composición corporal, somatotipo Heath-Carter y somatocarta con comparación contra la medición anterior.
+
+El frontend envía las medidas brutas. El backend calcula y persiste las sumatorias, porcentaje de grasa y somatotipo; `id_evaluador` se toma del JWT y no del body recibido. La masa muscular permanece sin calcular mientras el modelo no disponga de una fórmula validada y de las variables requeridas.
+
 ## Problemas Resueltos Recientemente
 
 ### Passwords en Texto Plano
@@ -672,10 +724,6 @@ Si aparece `El usuario esta inactivo`, el usuario existe pero tiene `activo = fa
 - No hay cabeceras de seguridad HTTP adicionales (`helmet`) ni limites explicitos de tamano de payload.
 
 ## Siguiente Paso Recomendado
-
-DATABASE_URL="postgresql://admin:MyTr2026@localhost:5432/AthLyzerDB"
-JWT_SECRET="53791e2fba3d3a28de8aac4a52606080841ae6e8287f9a333d41143ffe5fb6900ec2671084b99a7a1425f7cbb67b8ef9f65d06ff91d50f6c395e8c23c7845c91"
-JWT_EXPIRES_IN="8h"
 
 El siguiente bloque tecnico recomendable es:
 
