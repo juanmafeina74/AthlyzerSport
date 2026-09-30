@@ -81,7 +81,7 @@ function resolvePhoto(photo: string | null) {
 
 function Stat({ label, value, unit }: { label: string; value: string | number; unit?: string }) {
   return (
-    <div className="border-l-2 border-emerald-500 pl-3">
+    <div className="border-l-2 border-status-medical pl-3">
       <p className="text-xs font-medium uppercase text-gray-500">{label}</p>
       <p className="mt-1 text-xl font-semibold text-gray-950">{value}{unit && <span className="ml-1 text-sm font-normal text-gray-500">{unit}</span>}</p>
     </div>

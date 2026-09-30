@@ -9,22 +9,30 @@ export default {
 
       colors: {
         brand: {
-          dark: "#1a1a1a",      // Sidebar oscuro
-          light: "#f5f5f5",     // Fondo general
-          primary: "#2563eb",   // Azul botones / progreso
-          secondary: "#111827", // Botón negro
-          accent: "#3b82f6",    // Azul claro
+          dark: "#1f2937",
+          light: "var(--color-background)",
+          primary: "var(--color-primary)",
+          secondary: "var(--color-secondary)",
+          accent: "var(--color-secondary)",
         },
 
         panel: {
-          bg: "#ffffff",
-          border: "#e5e7eb",
+          bg: "var(--color-surface)",
+          border: "var(--color-border)",
         },
 
         alert: {
           info: "#dbeafe",
           warning: "#fef3c7",
           danger: "#fee2e2",
+        },
+
+        red: {
+          800: "var(--color-danger)",
+        },
+
+        status: {
+          medical: "var(--color-medical)",
         },
       },
 

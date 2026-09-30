@@ -284,14 +284,14 @@ export default function MedicionAntropometricaCreate() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header>
-        <p className="text-sm font-semibold uppercase text-emerald-700">Protocolo ISAK</p>
+        <p className="text-sm font-semibold uppercase text-status-medical">Protocolo ISAK</p>
         <h1 className="text-3xl font-semibold text-gray-950">Nueva evaluación antropométrica</h1>
       </header>
 
       <ol className="grid grid-cols-2 gap-2 md:grid-cols-4" aria-label="Progreso de la evaluación">
         {steps.map((label, index) => (
-          <li key={label} className={`border-t-4 px-2 py-3 ${index <= step ? "border-emerald-600" : "border-gray-200"}`}>
-            <span className={`mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${index === step ? "bg-emerald-600 text-white" : index < step ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500"}`}>{index + 1}</span>
+          <li key={label} className={`border-t-4 px-2 py-3 ${index <= step ? "border-status-medical" : "border-gray-200"}`}>
+            <span className={`mr-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${index === step ? "bg-status-medical text-white" : index < step ? "bg-emerald-100 text-emerald-800" : "bg-gray-100 text-gray-500"}`}>{index + 1}</span>
             <span className="text-sm font-medium text-gray-700">{label}</span>
           </li>
         ))}
