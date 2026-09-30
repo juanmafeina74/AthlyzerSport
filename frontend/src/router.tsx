@@ -16,6 +16,7 @@ import JugadorList from "./components/jugadores/JugadorList";
 import JugadorEdit from "./components/jugadores/JugadorEdit";
 import JugadorCreate from "./components/jugadores/JugadorCreate";
 import JugadorDetail from "./components/jugadores/JugadorDetail";
+import ReathBoard from "./components/lesiones/ReathBoard";
 import MedicionAntropometricaCreate from "./components/mediciones-antropometricas/MedicionAntropometricaCreate";
 import TemporadaList from "./components/temporadas/TemporadaList";
 import TemporadaCreate from "./components/temporadas/TemporadaCreate";
@@ -112,6 +113,7 @@ export default function Router() {
         <Route path="/jugadores/editar/:id" element={<RequireAuth><JugadorEdit /></RequireAuth>} />
         <Route path="/jugadores/borrar/:id" element={<RequireAuth><JugadorDelete /></RequireAuth>} />
         <Route path="/mediciones-antropometricas/crear" element={<RequireEvaluator><MedicionAntropometricaCreate /></RequireEvaluator>} />
+        <Route path="/lesiones" element={<RequireEvaluator><ReathBoard /></RequireEvaluator>} />
         <Route path="/temporadas" element={<RequireAuth><TemporadaList /></RequireAuth>} />
         <Route path="/temporadas/crear" element={<RequireAuth><TemporadaCreate /></RequireAuth>} />
         <Route path="/temporadas/editar/:id" element={<RequireAuth><TemporadaEdit /></RequireAuth>} />

@@ -38,6 +38,7 @@ type Injury = {
   fecha_fin: string | null;
   tipo_lesion: string | null;
   zona_corporal: string | null;
+  fase_readaptacion: string;
   gravedad: string | null;
   alta_medica: boolean;
   observaciones: string | null;
@@ -262,12 +263,13 @@ export default function JugadorDetail() {
               <h2 className="text-lg font-semibold">Estado médico</h2>
               <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeInjuries.length ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{activeInjuries.length ? `${activeInjuries.length} activa(s)` : "Sin lesiones activas"}</span>
             </div>
+            {(user?.role === "admin" || user?.role === "usuario") && <LinkButton to={`/lesiones?jugador=${player.id_jugador}`}>Registrar lesión / Ver tablero</LinkButton>}
             <div className="space-y-4">
               {player.lesion.slice(0, 4).map((injury) => (
                 <article key={injury.id_lesion} className="border-l-2 border-gray-300 pl-3 text-sm">
                   <p className="font-medium text-gray-900">{injury.tipo_lesion ?? "Lesión sin clasificar"}</p>
                   <p className="text-gray-500">{injury.zona_corporal ?? "Zona no indicada"} · {injury.gravedad ?? "Gravedad no indicada"}</p>
-                  <p className="mt-1 text-xs text-gray-400">Desde {formatDate(injury.fecha_inicio)}</p>
+                  <p className="mt-1 text-xs text-gray-500">{injury.fase_readaptacion} · Desde {formatDate(injury.fecha_inicio)}</p>
                 </article>
               ))}
               {!player.lesion.length && <p className="text-sm text-gray-500">No hay lesiones registradas.</p>}

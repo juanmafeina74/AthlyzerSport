@@ -82,6 +82,8 @@ model lesion {
   fecha_fin     DateTime? @db.Date
   tipo_lesion   String?   @db.VarChar(100)
   zona_corporal String?   @db.VarChar(100)
+  fase_readaptacion String @default("Fase 1") @db.VarChar(30)
+  fecha_alta_real DateTime? @db.Date
   gravedad      String?   @db.VarChar(50)
   alta_medica   Boolean   @default(false)
   observaciones String?

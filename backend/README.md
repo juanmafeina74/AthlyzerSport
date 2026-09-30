@@ -135,6 +135,10 @@ POST /api/mediciones-antropometricas                     admin, usuario
 
 El `POST` recibe datos brutos del protocolo ISAK. El servicio calcula y persiste sumatoria de seis/ocho pliegues cuando corresponde, porcentaje de grasa mediante Faulkner y componentes Heath-Carter disponibles. `id_evaluador` se obtiene de `request.user.id_usuario`, no del body.
 
+## Lesiones y readaptación
+
+Los roles `admin` y `usuario` pueden usar `GET /api/lesiones` (incluye jugador), `POST /api/lesiones` (jugador, fecha de inicio, tipo, zona corporal y observaciones opcionales) y `PATCH /api/lesiones/:id/fase` con `{ "fase": "Fase 2" }`. Se aceptan `Fase 1` a `Fase 4` y `Alta Médica`; el alta solo se permite desde `Fase 4` y actualiza también `alta_medica` y `fecha_alta_real`. El frontend ofrece el mapa anatómico y el tablero en `/lesiones`.
+
 ## Prisma y modelo de datos
 
 El esquema está en `prisma/schema.prisma`. Modelos: `rol`, `usuario`, `categoria`, `temporada`, `equipo`, `jugador`, `jugador_equipo`, `lesion`, `medicion_antropometrica` y `posicion`.
@@ -149,6 +153,7 @@ Migraciones actuales:
 20260914110403_auth_roles_users
 20260916090000_categorias_equipos
 20260922120000_mediciones_antropometricas_isak
+20260930120000_lesion_readaptacion
 ```
 
 ## Calidad
@@ -164,7 +169,7 @@ Las pruebas nuevas cubren cálculos antropométricos, persistencia del evaluador
 
 ## Pendientes conocidos
 
-- No existe todavía CRUD de lesiones ni relación entre jugador y posición.
+- Lesiones solo dispone de registro, listado y cambio de fase; faltan edición/eliminación y la relación entre jugador y posición.
 - La masa muscular antropométrica no se calcula mientras no se definan una fórmula validada y las variables requeridas.
 - No hay refresh tokens ni cookies HttpOnly; el frontend guarda el JWT en `localStorage`.
 - No hay `helmet` ni CI configurado.
