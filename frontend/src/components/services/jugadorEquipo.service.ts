@@ -6,12 +6,16 @@ export type Jugador = {
   dni: string;
   nombre: string;
   apellidos: string;
+  posicion_preferida: { id_posicion: number; nombre: string; abreviatura: string | null } | null;
 };
+
+export type Posicion = { id_posicion: number; nombre: string; abreviatura: string | null };
 
 export type PlantillaEntry = {
   id_jugador_equipo: number;
   id_jugador: number;
   dorsal: number | null;
+  posicion: Posicion | null;
   fecha_inicio: string;
   jugador: Jugador;
 };
@@ -43,5 +47,12 @@ export default {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ id_jugadores: idJugadores }),
+    }),
+
+  updatePosition: (idEquipo: number, idJugador: number, idPosicion: number | null) =>
+    fetch(`${API}/${idEquipo}/plantilla/${idJugador}/posicion`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ id_posicion: idPosicion }),
     }),
 };

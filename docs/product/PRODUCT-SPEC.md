@@ -1,7 +1,7 @@
 # AthLyzer Sports Train: especificación de producto
 
 Estado: documento de referencia previo a la futura configuración de agentes.
-Fecha de revisión: 2026-10-06.
+Fecha de revisión: 2026-10-08.
 
 ## Propósito y alcance
 
@@ -36,6 +36,7 @@ Los `GET` de otros módulos pueden admitir cualquier usuario autenticado; se deb
 - Autenticación mediante credenciales, bcrypt y JWT; autorización por roles en backend.
 - Gestión de usuarios, categorías, temporadas, equipos y jugadores.
 - Gestión de plantilla jugador-equipo, con altas individuales/en bloque y baja lógica que conserva la relación histórica.
+- Posiciones: catálogo administrable por `admin`, posición preferida opcional del jugador y posición principal opcional por pertenencia jugador-equipo, mantenibles desde las pantallas de administración, jugador y plantilla.
 - Lesiones: consulta, alta y cambio de fase de readaptación. Esto no equivale a un CRUD completo.
 - Antropometría: alta de mediciones e historial por jugador. El servidor calcula y persiste resultados derivados.
 - Fotografía de jugador almacenada como archivo; la base de datos conserva una referencia, no el binario.
@@ -49,6 +50,7 @@ El inventario detallado de endpoints y pantallas debe contrastarse con el códig
 - Una categoría con equipos asociados no se puede eliminar.
 - Una temporada con equipos asociados no se puede eliminar. No confiar en cascadas de base de datos para saltarse esta regla.
 - Quitar un jugador de una plantilla desactiva la relación y conserva su historial; una asignación posterior puede reactivar la relación existente.
+- La posición preferida pertenece al jugador; la posición principal asignada a una plantilla pertenece a la relación jugador-equipo y puede ser distinta. Se conserva una sola posición principal por pertenencia.
 - El evaluador de una medición se obtiene de la identidad autenticada en el JWT, nunca de un identificador confiado del body.
 - Los equipos existentes se inicializan con ISAK; los nuevos usan BASICA por defecto. Solo admin puede cambiar su modalidad.
 - Con pertenencias activas, cada medición requiere seleccionar explícitamente un equipo y usar su modalidad vigente. Sin equipos activos, se elige BASICA o ISAK al registrar y se guarda sin equipo. No se registran mediciones de pertenencias finalizadas.
@@ -60,7 +62,7 @@ El inventario detallado de endpoints y pantallas debe contrastarse con el códig
 
 ## Fuera del alcance confirmado / evolución
 
-Son ideas, no requisitos actuales: planificación de entrenamientos, portal del jugador, aplicación móvil, gestión documental, analítica avanzada, varios clubes/deportes y una auditoría global. `posicion` existe como tabla Prisma, pero todavía no está relacionada con `jugador` ni representa un módulo funcional. El cálculo de masa muscular solo debe incorporarse cuando se acuerden y validen sus variables y fórmula. Las iniciativas futuras y su priorización se recogen en [ROADMAP-SPEC.md](ROADMAP-SPEC.md); ese documento no implica por sí mismo compromiso de implementación.
+Son ideas, no requisitos actuales: planificación de entrenamientos, portal del jugador, aplicación móvil, gestión documental, analítica avanzada, varios clubes/deportes y una auditoría global. El modelo actual admite una posición principal por jugador-equipo; admitir varias posiciones simultáneas en la misma pertenencia requeriría ampliar la relación. El cálculo de masa muscular solo debe incorporarse cuando se acuerden y validen sus variables y fórmula. Las iniciativas futuras y su priorización se recogen en [ROADMAP-SPEC.md](ROADMAP-SPEC.md); ese documento no implica por sí mismo compromiso de implementación.
 
 ## Criterio para nuevas funcionalidades
 

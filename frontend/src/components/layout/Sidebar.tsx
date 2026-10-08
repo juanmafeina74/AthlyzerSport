@@ -13,6 +13,7 @@ export function Sidebar() {
             <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/equipos">Equipos</a>
             <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/categorias">Categorías</a>
             <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/jugadores">Jugadores</a>
+            <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/posiciones">Posiciones</a>
             <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/mediciones-antropometricas/crear">Antropometría</a>
             <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/lesiones">Lesiones y Reath</a>
             <a className="block whitespace-nowrap rounded px-2 py-1 hover:bg-white/10 hover:text-brand-accent md:px-0" href="/temporadas">Temporadas</a>

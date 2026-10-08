@@ -23,6 +23,7 @@ Estado actual:
 - Ficha ampliada de jugador en `/jugadores/:id`, con acceso por doble clic sobre la card, teclado o boton visible.
 - Subida de fotografia de jugador para administradores; el archivo se almacena fuera de PostgreSQL y la BD conserva solo su ruta publica.
 - Captura antropométrica BASICA o ISAK según la modalidad configurada por equipo, con historial, cálculos ISAK en backend y auditoría del evaluador.
+- Seguimiento de lesiones y readaptación: registro con mapa corporal, tablero por fases, altas médicas y resumen de plantilla.
 - Tests de integracion (e2e) que cubren JWT/roles y rate limiting en endpoints protegidos: sin token, token invalido, rol no admin, rol admin y bloqueo por exceso de intentos de login, extendidos a equipos, jugadores, categorias, usuarios, temporadas y a los distintos casos de negocio de `auth.login`.
 - Frontend con rutas privadas: si no hay usuario logado con token, redirige a `/login`.
 - UI unificada alrededor de componentes `Card`, `Button`, `LinkButton`, `FormInput`, `FormSelect` y `FormTextarea`.
@@ -339,9 +340,19 @@ POST   /api/equipos/:idEquipo/plantilla                 admin  # asigna un jugad
 POST   /api/equipos/:idEquipo/plantilla/bulk-assign     admin  # asigna varios { id_jugadores: number[] }
 POST   /api/equipos/:idEquipo/plantilla/bulk-remove     admin  # quita varios { id_jugadores: number[] }
 DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin  # quita un jugador
+PATCH  /api/equipos/:idEquipo/plantilla/:idJugador/posicion admin  # asigna o limpia la posición del jugador en el equipo
 
 GET    /api/mediciones-antropometricas/jugador/:idJugador  admin, usuario
 POST   /api/mediciones-antropometricas                       admin, usuario
+
+GET    /api/lesiones                    admin, usuario
+POST   /api/lesiones                    admin, usuario
+PATCH  /api/lesiones/:id/fase           admin, usuario
+
+GET    /api/posiciones                  cualquier usuario autenticado
+POST   /api/posiciones                  admin
+PUT    /api/posiciones/:id              admin
+DELETE /api/posiciones/:id              admin
 ```
 
 Los equipos exponen `protocolo_antropometrico` y `version_protocolo_antropometrico`. Solo `admin` puede configurar la modalidad. Los equipos existentes se migraron como ISAK y los nuevos usan BASICA por defecto. Con pertenencias activas se selecciona explícitamente el equipo; sin ellas se elige el protocolo y el registro queda sin equipo. El historial conserva el protocolo y el equipo de origen.
@@ -389,11 +400,11 @@ Modelos definidos actualmente:
 - `categoria`: categorías deportivas con identificador, nombre único y estado activo.
 - `temporada`: temporadas deportivas.
 - `equipo`: equipos asociados a una temporada y, opcionalmente, a una categoría mediante `id_categoria`.
-- `jugador`: jugadores con DNI, nombre, apellidos, fecha de nacimiento y foto.
-- `jugador_equipo`: relacion jugador-equipo con fechas, dorsal y estado activo.
-- `lesion`: lesiones de jugadores.
+- `jugador`: jugadores con DNI, nombre, apellidos, fecha de nacimiento, foto y posición preferida opcional.
+- `jugador_equipo`: relación histórica jugador-equipo con fechas, dorsal, posición principal opcional y estado activo.
+- `lesion`: jugador, fecha de inicio y fin, tipo, zona corporal, gravedad, fase de readaptación, alta médica, observaciones y fecha de alta real.
 - `medicion_antropometrica`: modalidades BASICA/ISAK, medidas comunes, resultados derivados nullable según modalidad, equipo de origen opcional, evaluador y marcas de auditoria.
-- `posicion`: posiciones deportivas.
+- `posicion`: catálogo para la preferencia del jugador y la posición principal en cada pertenencia.
 
 Migraciones Prisma existentes:
 
@@ -406,6 +417,7 @@ backend/prisma/migrations/
 	20260922120000_mediciones_antropometricas_isak/
 	20260930120000_lesion_readaptacion/
 	20261006160000_protocolos_antropometricos/
+	20261008120000_player_positions/
 ```
 
 ## Frontend
@@ -446,6 +458,7 @@ frontend/src/
 		equipos/
 		jugadores/
 		mediciones-antropometricas/
+		lesiones/
 		temporadas/
 ```
 
@@ -473,6 +486,7 @@ Rutas actuales:
 /categorias/crear
 /categorias/editar/:id
 /categorias/borrar/:id
+/posiciones
 /usuarios
 /usuarios/crear
 /usuarios/editar/:id
@@ -487,6 +501,7 @@ Rutas actuales:
 /jugadores/borrar/:id
 /jugadores/:id
 /mediciones-antropometricas/crear
+/lesiones
 /temporadas
 /temporadas/crear
 /temporadas/editar/:id
@@ -502,7 +517,9 @@ Los servicios estan en `frontend/src/components/services/`.
 - `usuarios.service.ts`: llamadas a `/api/usuarios` y `/api/usuarios/roles`.
 - `equipos.service.ts`: llamadas a `/api/equipos`.
 - `jugadores.service.ts`: llamadas a `/api/jugadores`, detalle ampliado y subida de foto.
+- `posiciones.service.ts`: catálogo CRUD disponible para la selección de posiciones.
 - `medicionesAntropometricas.service.ts`: historial y creación de mediciones BASICA/ISAK.
+- `lesiones.service.ts`: listado, alta y actualización de fase de lesiones.
 - `temporadas.service.ts`: llamadas a `/api/temporadas`.
 
 Los servicios CRUD adjuntan `Authorization: Bearer ...` usando el token guardado en `localStorage`.
@@ -545,6 +562,7 @@ Pantallas ya alineadas con este sistema:
 - Subida de foto desde la ficha para administradores; JPEG, PNG y WebP hasta 5 MB.
 - Crear, editar y borrar temporadas.
 - Captura BASICA en dos pasos (contexto y medidas básicas) o ISAK en cuatro pasos; el formulario elige los campos y resultados según equipo y modalidad.
+- Tablero de lesiones y readaptación con cuatro fases, alta médica y mapa corporal anterior/posterior.
 
 ## Validacion Ejecutada
 
@@ -626,7 +644,7 @@ A nivel de datos, "mover" un jugador no lo borra fisicamente: la tabla `jugador_
 
 Endpoints usados (ver sección "Autorizacion de Endpoints"): lectura disponible para cualquier rol autenticado; asignar/quitar (individual o en bloque) requiere rol `admin`.
 
-Limitacion conocida: el filtro de disponibles solo es por texto (nombre/apellidos/DNI); el esquema actual no vincula `jugador` con `categoria` ni con `posicion`, por lo que no es posible filtrar por esos campos sin ampliar el modelo de datos.
+Limitación conocida: el filtro de jugadores disponibles solo es por texto (nombre/apellidos/DNI); no existe relación jugador-categoría.
 
 Aviso no bloqueante observado: Vitest muestra una recomendacion relacionada con `vite-tsconfig-paths`, indicando que Vite ya soporta resolucion nativa de paths mediante `resolve.tsconfigPaths`.
 
@@ -636,11 +654,14 @@ Desde `/jugadores`, una card se puede abrir con doble clic, con la tecla `Enter`
 
 - Datos personales, DNI, fecha de nacimiento, edad y estado deportivo.
 - Equipo o equipos activos, dorsal, categoría y temporada.
+- Posición preferida del jugador y posición asignada en cada pertenencia.
 - Histórico de equipos con fechas de pertenencia.
 - Última medición antropométrica y hasta cuatro mediciones anteriores.
 - Lesiones registradas y número de lesiones activas.
 
 El endpoint `GET /api/jugadores/:id` carga estas relaciones en una sola consulta Prisma, ordena equipos y lesiones por fecha y limita a cinco las mediciones más recientes.
+
+La posición preferida se edita en el alta/edición del jugador y aparece en su ficha. La plantilla de cada equipo muestra esa preferencia y permite a `admin` asignar una posición principal distinta para esa pertenencia. El catálogo se crea y mantiene desde `/posiciones`, disponible para `admin`.
 
 ### Fotografías
 
@@ -653,6 +674,22 @@ La columna `jugador.foto` almacena una URL o ruta, no el binario de la imagen. L
 - Al sustituir o eliminar un jugador, se intenta eliminar el archivo local anterior.
 
 En producción, el mismo contrato puede conectarse a almacenamiento de objetos o CDN guardando en `jugador.foto` únicamente la URL resultante.
+
+## Lesiones y Readaptación
+
+Los roles `admin` y `usuario` pueden consultar y registrar lesiones, y cambiar su fase de readaptación. La API expone:
+
+```text
+GET    /api/lesiones
+POST   /api/lesiones
+PATCH  /api/lesiones/:id/fase
+```
+
+El registro requiere jugador, fecha de inicio, tipo de lesión y zona corporal; las observaciones son opcionales. Cada lesión nueva empieza en `Fase 1`. Se pueden asignar las fases `Fase 1` a `Fase 4`; el alta médica solo se permite desde `Fase 4` y es irreversible desde la API. No hay endpoints para editar el resto de los datos ni eliminar lesiones.
+
+La pantalla `/lesiones` ofrece un mapa corporal con vistas anterior y posterior para seleccionar la zona, columnas para las cuatro fases y cambio de fase mediante selector o arrastre. Las lesiones dadas de alta aparecen en una sección separada. El dashboard resume las lesiones activas de la plantilla del equipo seleccionado y ofrece el acceso al registro. La ficha `/jugadores/:id` muestra el estado de lesiones activas y hasta cuatro registros.
+
+**Alcance de acceso:** `GET /api/lesiones` devuelve el listado global, incluyendo datos del jugador, a cualquier usuario con rol `admin` o `usuario`; la API no filtra por equipo. El dashboard filtra localmente según la plantilla seleccionada, pero eso no restringe las respuestas del backend. La aplicación tampoco tiene aislamiento por club o tenant, por lo que debe considerarse una limitación de privacidad pendiente.
 
 ## Mediciones Antropométricas BASICA e ISAK
 

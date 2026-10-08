@@ -549,3 +549,93 @@ describe('Temporadas (e2e)', () => {
       .expect(201);
   });
 });
+
+describe('Posiciones (e2e)', () => {
+  const prismaMock = {
+    posicion: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn(),
+      create: vi.fn().mockResolvedValue({ id_posicion: 1, nombre: 'Portero', abreviatura: 'POR' }),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
+  let app: Awaited<ReturnType<typeof createApp>>;
+
+  beforeAll(async () => {
+    app = await createApp(prismaMock);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('permite consultar el catálogo a usuarios autenticados', () => {
+    return request(app.getHttpServer())
+      .get('/api/posiciones')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`)
+      .expect(200);
+  });
+
+  it('reserva la creación de posiciones a admin', () => {
+    return request(app.getHttpServer())
+      .post('/api/posiciones')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`)
+      .send({ nombre: 'Portero' })
+      .expect(403);
+  });
+
+  it('permite a admin crear una posición validada', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/posiciones')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`)
+      .send({ nombre: 'Portero', abreviatura: 'POR' })
+      .expect(201);
+    expect(response.body).toMatchObject({ id_posicion: 1, nombre: 'Portero' });
+  });
+});
+
+describe('Posición de plantilla (e2e)', () => {
+  const prismaMock = {
+    equipo: { findUnique: vi.fn().mockResolvedValue({ id_equipo: 1 }) },
+    posicion: { findUnique: vi.fn().mockResolvedValue({ id_posicion: 2, nombre: 'Defensa' }) },
+    jugador_equipo: {
+      findFirst: vi.fn().mockResolvedValue({ id_jugador_equipo: 10 }),
+      update: vi.fn().mockResolvedValue({ id_jugador_equipo: 10, id_posicion: 2 }),
+    },
+  };
+  let app: Awaited<ReturnType<typeof createApp>>;
+
+  beforeAll(async () => {
+    app = await createApp(prismaMock);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('solo admin puede asignar la posición en una pertenencia activa', async () => {
+    await request(app.getHttpServer())
+      .patch('/api/equipos/1/plantilla/5/posicion')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`)
+      .send({ id_posicion: 2 })
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .patch('/api/equipos/1/plantilla/5/posicion')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`)
+      .send({ id_posicion: 2 })
+      .expect(200);
+    expect(prismaMock.jugador_equipo.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { id_posicion: 2 },
+    }));
+  });
+
+  it('rechaza un body sin id_posicion', () => {
+    return request(app.getHttpServer())
+      .patch('/api/equipos/1/plantilla/5/posicion')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`)
+      .send({})
+      .expect(400);
+  });
+});

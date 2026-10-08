@@ -6,6 +6,7 @@ import { loadEnvFile } from 'node:process';
 import { BadRequestException } from '@nestjs/common';
 import { PrismaClient, ProtocoloAntropometrico } from '@prisma/client';
 import { EquiposService } from '../src/equipos/equipos.service.js';
+import { JugadorEquipoService } from '../src/jugador-equipo/jugador-equipo.service.js';
 import { MedicionesAntropometricasService } from '../src/mediciones-antropometricas/mediciones-antropometricas.service.js';
 
 const migrationSuite = process.env.TEST_PROTOCOL_MIGRATION === '1' ? describe : describe.skip;
@@ -64,6 +65,7 @@ migrationSuite('Protocolos antropometricos: migracion PostgreSQL aislada', () =>
       VALUES (1, 1, '2026-09-22', 74.5, 178, 8, 10, 7, 12, 11, 7, 777, 12.34, 37.7, 2.1, 4.2, 1.8, '2026-09-22')`;
     [previousMeasurement] = await client.$queryRaw<Record<string, unknown>[]>`SELECT * FROM "medicion_antropometrica"`;
     applyMigration(migration);
+    applyMigration('20261008120000_player_positions');
     await client.$disconnect();
     await client.$connect();
   }, 120_000);
@@ -119,6 +121,26 @@ migrationSuite('Protocolos antropometricos: migracion PostgreSQL aislada', () =>
     await expect(client.equipo.delete({ where: { id_equipo: 1 } })).rejects.toThrow(/medicion_antropometrica_id_equipo_fkey/);
     await expect(client.temporada.delete({ where: { id_temporada: 1 } })).rejects.toThrow(/equipo_id_temporada_fkey/);
     expect(await client.medicion_antropometrica.count()).toBe(3);
+  });
+
+  it('persiste la posición preferida y la posición específica de la plantilla', async () => {
+    const position = await client.posicion.create({ data: { nombre: 'Posición de prueba', abreviatura: 'PDT' } });
+    await client.jugador.update({
+      where: { id_jugador: 1 },
+      data: { id_posicion_preferida: position.id_posicion },
+    });
+    await client.jugador_equipo.updateMany({
+      where: { id_jugador: 1, id_equipo: 1, activo: true },
+      data: { id_posicion: position.id_posicion },
+    });
+
+    const roster = await new JugadorEquipoService(client as never).findPlantilla(1);
+    expect(roster[0]).toMatchObject({
+      posicion: { id_posicion: position.id_posicion, nombre: 'Posición de prueba' },
+      jugador: { posicion_preferida: { id_posicion: position.id_posicion } },
+    });
+    await expect(client.posicion.delete({ where: { id_posicion: position.id_posicion } }))
+      .rejects.toThrow(/jugador_id_posicion_preferida_fkey|jugador_equipo_id_posicion_fkey/);
   });
 
   it('rechaza una medición retrospectiva de una pertenencia finalizada', async () => {

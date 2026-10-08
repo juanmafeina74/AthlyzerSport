@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import LoginPage from "./components/auth/LoginPage";
+import PosicionesPage from "./components/posiciones/PosicionesPage";
 import CategoriaCreate from "./components/categorias/CategoriaCreate";
 import CategoriaDelete from "./components/categorias/CategoriaDelete";
 import CategoriaEdit from "./components/categorias/CategoriaEdit";
@@ -93,6 +94,7 @@ export default function Router() {
         <Route path="/" element={<RouteFallback />} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+        <Route path="/posiciones" element={<RequireAdmin><PosicionesPage /></RequireAdmin>} />
         <Route path="/categorias" element={<RequireAdmin><CategoriaList /></RequireAdmin>} />
         <Route path="/categorias/crear" element={<RequireAdmin><CategoriaCreate /></RequireAdmin>} />
         <Route path="/categorias/editar/:id" element={<RequireAdmin><CategoriaEdit /></RequireAdmin>} />

@@ -72,6 +72,7 @@ Módulos principales:
 - `equipos`: equipos por temporada y categoría.
 - `jugadores`: CRUD, ficha ampliada y fotografía.
 - `jugador-equipo`: asignación y baja lógica de jugadores en plantillas.
+- `posiciones`: catálogo de posiciones, posición preferida del jugador y posición asignada por pertenencia.
 - `mediciones-antropometricas`: modalidades BASICA/ISAK, cálculos y auditoría del evaluador.
 - `temporadas`: temporadas deportivas.
 - `usuarios`: administración de usuarios y roles.
@@ -109,7 +110,7 @@ DELETE /api/jugadores/:id             admin
 POST   /api/jugadores/:id/foto        admin
 ```
 
-`GET /api/jugadores/:id` devuelve datos personales, equipos actuales e históricos, lesiones y las cinco mediciones antropométricas más recientes con su evaluador.
+`GET /api/jugadores/:id` devuelve datos personales, posición preferida, equipos actuales e históricos con sus posiciones asignadas, lesiones y las cinco mediciones antropométricas más recientes con su evaluador.
 
 La subida de foto usa `multipart/form-data`, campo `foto`, formatos JPEG/PNG/WebP y máximo 5 MB. El archivo se guarda en `uploads/jugadores/`, servido como `/uploads/jugadores/...`; la columna `jugador.foto` solo guarda la ruta. El directorio está excluido de Git. En producción puede sustituirse por almacenamiento de objetos o CDN manteniendo el mismo contrato de URL.
 
@@ -122,9 +123,21 @@ POST   /api/equipos/:idEquipo/plantilla                 admin
 POST   /api/equipos/:idEquipo/plantilla/bulk-assign     admin
 POST   /api/equipos/:idEquipo/plantilla/bulk-remove     admin
 DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin
+PATCH  /api/equipos/:idEquipo/plantilla/:idJugador/posicion  admin
 ```
 
-Las bajas son lógicas: se conserva el histórico y una reasignación reactiva la relación existente.
+Las bajas son lógicas: se conserva el histórico y una reasignación reactiva la relación existente. La alta individual acepta `id_posicion` opcional. El `PATCH` de posición recibe `{ "id_posicion": 3 }` o `{ "id_posicion": null }`, y solo modifica pertenencias activas; la respuesta incluye la posición asignada.
+
+### Posiciones
+
+```text
+GET    /api/posiciones       cualquier usuario autenticado
+POST   /api/posiciones       admin
+PUT    /api/posiciones/:id   admin
+DELETE /api/posiciones/:id   admin
+```
+
+El catálogo no se siembra con posiciones predeterminadas: `admin` crea sus opciones con `nombre` y `abreviatura` opcional. El borrado devuelve `409` si la posición se usa como preferida por un jugador o está asignada en alguna pertenencia. `POST` y `PUT` de jugadores aceptan `id_posicion_preferida` opcional; se puede enviar `null` en `PUT` para quitar la preferencia. Las respuestas de detalle del jugador incluyen `posicion_preferida` y cada entrada de `jugador_equipo` incluye su relación `posicion`.
 
 ### Mediciones antropométricas
 
@@ -188,7 +201,7 @@ Los roles `admin` y `usuario` pueden usar `GET /api/lesiones` (incluye jugador),
 
 ## Prisma y modelo de datos
 
-El esquema está en `prisma/schema.prisma`. Modelos: `rol`, `usuario`, `categoria`, `temporada`, `equipo`, `jugador`, `jugador_equipo`, `lesion`, `medicion_antropometrica` y `posicion`.
+El esquema está en `prisma/schema.prisma`. Modelos: `rol`, `usuario`, `categoria`, `temporada`, `equipo`, `jugador`, `jugador_equipo`, `lesion`, `medicion_antropometrica` y `posicion`. `jugador.id_posicion_preferida` guarda la preferencia individual y `jugador_equipo.id_posicion` la posición principal del jugador en esa pertenencia; ambas referencias son opcionales y restringen el borrado de una posición que siga asignada.
 
 La migración `20260922120000_mediciones_antropometricas_isak` sustituye el modelo antropométrico inicial por el protocolo ISAK completo. Si hubiera mediciones antiguas, la migración se detiene para evitar atribuir evaluadores o inventar pliegues inexistentes.
 
@@ -202,6 +215,7 @@ Migraciones actuales:
 20260922120000_mediciones_antropometricas_isak
 20260930120000_lesion_readaptacion
 20261006160000_protocolos_antropometricos
+20261008120000_player_positions
 ```
 
 La migración de protocolos inicializa equipos existentes y mediciones previas como `ISAK`; deja `id_equipo = null` en las mediciones previas, sin deducir un origen ni recalcular resultados. Los seis pliegues pasan a nullable y los equipos creados posteriormente usan `BASICA` por defecto. Aplicar mediante `npm run prisma:migrate` y regenerar el cliente con `npx prisma generate` durante el despliegue coordinado del backend.
@@ -236,7 +250,7 @@ Aplica las migraciones en un esquema aislado con datos ficticios, verifica la co
 
 ## Pendientes conocidos
 
-- Lesiones solo dispone de registro, listado y cambio de fase; faltan edición/eliminación y la relación entre jugador y posición.
+- Lesiones solo dispone de registro, listado y cambio de fase; faltan edición y eliminación.
 - La masa muscular antropométrica no se calcula mientras no se definan una fórmula validada y las variables requeridas.
 - No hay refresh tokens ni cookies HttpOnly; el frontend guarda el JWT en `localStorage`.
 - No hay `helmet` ni CI configurado.

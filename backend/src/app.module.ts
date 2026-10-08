@@ -11,6 +11,7 @@ import { JugadoresModule } from './jugadores/jugadores.module.js';
 import { JugadorEquipoModule } from './jugador-equipo/jugador-equipo.module.js';
 import { LesionesModule } from './lesiones/lesiones.module.js';
 import { MedicionesAntropometricasModule } from './mediciones-antropometricas/mediciones-antropometricas.module.js';
+import { PosicionesModule } from './posiciones/posiciones.module.js';
 import { TemporadasModule } from './temporadas/temporadas.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 
@@ -28,6 +29,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     JugadorEquipoModule,
     LesionesModule,
     MedicionesAntropometricasModule,
+    PosicionesModule,
     TemporadasModule,
     UsuariosModule,
   ],

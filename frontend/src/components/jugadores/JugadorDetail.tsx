@@ -10,6 +10,7 @@ type TeamAssignment = {
   fecha_inicio: string;
   fecha_fin: string | null;
   dorsal: number | null;
+  posicion: { id_posicion: number; nombre: string; abreviatura: string | null } | null;
   activo: boolean;
   equipo: {
     id_equipo: number;
@@ -54,6 +55,7 @@ type PlayerDetail = {
   apellidos: string;
   fecha_nacimiento: string;
   foto: string | null;
+  posicion_preferida: { id_posicion: number; nombre: string; abreviatura: string | null } | null;
   jugador_equipo: TeamAssignment[];
   medicion_antropometrica: Measurement[];
   lesion: Injury[];
@@ -206,6 +208,7 @@ export default function JugadorDetail() {
                   <p className="font-semibold text-gray-950">{assignment.equipo.nombre}</p>
                   <p className="mt-1 text-sm text-gray-600">{assignment.equipo.categoria?.nombre ?? "Sin categoría"} · {assignment.equipo.temporada.nombre}</p>
                   <p className="mt-3 text-sm text-gray-600">Dorsal: <strong>{assignment.dorsal ?? "Sin asignar"}</strong></p>
+                  <p className="text-sm text-gray-600">Posición en el equipo: <strong>{assignment.posicion?.nombre ?? "Sin asignar"}</strong></p>
                 </article>
               ))}
               {!currentTeams.length && <p className="text-sm text-gray-500">El jugador no está asignado a un equipo activo.</p>}
@@ -216,7 +219,7 @@ export default function JugadorDetail() {
                 <div className="space-y-3">
                   {previousTeams.map((assignment) => (
                     <div key={assignment.id_jugador_equipo} className="flex flex-col justify-between gap-1 text-sm sm:flex-row">
-                      <span className="font-medium text-gray-800">{assignment.equipo.nombre}</span>
+                      <span className="font-medium text-gray-800">{assignment.equipo.nombre} · {assignment.posicion?.nombre ?? "Sin posición"}</span>
                       <span className="text-gray-500">{formatDate(assignment.fecha_inicio)} – {formatDate(assignment.fecha_fin)}</span>
                     </div>
                   ))}
@@ -261,6 +264,7 @@ export default function JugadorDetail() {
               <div><dt className="text-gray-500">DNI</dt><dd className="font-medium text-gray-900">{player.dni}</dd></div>
               <div><dt className="text-gray-500">Fecha de nacimiento</dt><dd className="font-medium text-gray-900">{formatDate(player.fecha_nacimiento)}</dd></div>
               <div><dt className="text-gray-500">Edad</dt><dd className="font-medium text-gray-900">{calculateAge(player.fecha_nacimiento)} años</dd></div>
+              <div><dt className="text-gray-500">Posición preferida</dt><dd className="font-medium text-gray-900">{player.posicion_preferida?.nombre ?? "Sin definir"}</dd></div>
             </dl>
           </section>
 

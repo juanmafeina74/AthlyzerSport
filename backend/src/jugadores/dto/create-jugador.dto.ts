@@ -1,4 +1,4 @@
-import { IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min, ValidateIf } from 'class-validator';
 
 export class CreateJugadorDto {
   @IsNotEmpty({ message: 'El DNI es obligatorio.' })
@@ -19,4 +19,9 @@ export class CreateJugadorDto {
   @IsOptional()
   @IsString()
   foto?: string;
+
+  @ValidateIf((_data: CreateJugadorDto, value: unknown) => value !== undefined && value !== null)
+  @IsInt()
+  @Min(1)
+  id_posicion_preferida?: number | null;
 }

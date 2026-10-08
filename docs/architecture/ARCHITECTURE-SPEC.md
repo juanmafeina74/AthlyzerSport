@@ -1,7 +1,7 @@
 # AthLyzer Sports Train: especificación de arquitectura
 
 Estado: documento de referencia previo a la futura configuración de agentes.
-Fecha de revisión: 2026-10-06.
+Fecha de revisión: 2026-10-08.
 
 ## Topología actual
 
@@ -33,9 +33,9 @@ Controladores y DTOs son la frontera HTTP; los servicios son propietarios de las
 
 ## Módulos backend actuales
 
-Registrados en `backend/src/app.module.ts`: `auth`, `usuarios`, `categorias`, `equipos`, `jugadores`, `jugador-equipo`, `temporadas`, `lesiones` y `mediciones-antropometricas`.
+Registrados en `backend/src/app.module.ts`: `auth`, `usuarios`, `categorias`, `equipos`, `jugadores`, `jugador-equipo`, `posiciones`, `temporadas`, `lesiones` y `mediciones-antropometricas`.
 
-`posicion` está definida en Prisma, pero no tiene módulo de aplicación ni relación con jugador. Lesiones dispone de consulta, alta y cambio de fase; no asumir operaciones de CRUD no implementadas.
+`posicion` dispone de catálogo API, relación opcional como preferencia del jugador y relación opcional con cada pertenencia jugador-equipo. La UI permite mantener el catálogo desde Administración, editar la preferencia en el jugador y asignar la posición principal desde la plantilla. Lesiones dispone de consulta, alta y cambio de fase; no asumir operaciones de CRUD no implementadas.
 
 ## Convención de módulos
 

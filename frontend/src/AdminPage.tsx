@@ -35,6 +35,10 @@ export default function AdminPage() {
           <LinkButton color="black" to="/dashboard">Asignar planes</LinkButton>
         </div>
       </Card>
+
+      <Card title="Posiciones" description="Mantén el catálogo disponible para jugadores y plantillas.">
+        <LinkButton color="black" to="/posiciones">Gestionar posiciones</LinkButton>
+      </Card>
     </div>
   );
 }
