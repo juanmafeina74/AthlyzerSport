@@ -1,6 +1,6 @@
 # Análisis del Proyecto: AthLyzer Sports Train
 
-Fecha de actualización: 2026-09-23.
+Fecha de actualización: 2026-10-08.
 
 Este documento es la referencia técnica detallada del estado actual. El [README raíz](../README.md) contiene la guía rápida de instalación y uso; este análisis recoge arquitectura, inventario funcional, modelo de datos, decisiones recientes, riesgos y roadmap.
 
@@ -19,7 +19,7 @@ Este documento es la referencia técnica detallada del estado actual. El [README
 
 ## 1. Estado actual
 
-AthLyzer Sports Train es una aplicación web para gestión deportiva con autenticación, equipos, temporadas, jugadores, plantillas y evaluación antropométrica ISAK.
+AthLyzer Sports Train es una aplicación web para gestión deportiva con autenticación, equipos, temporadas, jugadores, plantillas y evaluación antropométrica en modalidades BASICA e ISAK.
 
 ### Implementado
 
@@ -33,8 +33,10 @@ AthLyzer Sports Train es una aplicación web para gestión deportiva con autenti
 - Ficha ampliada de jugador con datos personales, equipos, lesiones y mediciones recientes.
 - Doble clic, teclado y botón visible para abrir una ficha desde el listado de jugadores.
 - Subida de fotografías para administradores, con almacenamiento local de archivos y ruta persistida en BD.
-- Stepper antropométrico ISAK de cuatro pasos con historial, cálculos reactivos y somatocarta.
-- API antropométrica con auditoría del evaluador y cálculos derivados persistidos en servidor.
+- Captura antropométrica BASICA e ISAK, seleccionada según la configuración del equipo; los equipos nuevos usan BASICA y los existentes se migraron como ISAK.
+- Mediciones asociadas al equipo y protocolo usados, con historial mixto por jugador; el servidor valida la pertenencia y la versión de configuración antes de guardar.
+- Formulario BASICA de peso, talla, cintura opcional y observaciones; el formulario ISAK conserva sus seis pliegues obligatorios, perímetros, diámetros, cálculos y somatocarta.
+- API antropométrica con auditoría del evaluador y cálculos derivados persistidos en servidor; BASICA no genera resultados ISAK.
 - Throttling global y límite específico para login.
 
 ### No implementado todavía
@@ -80,10 +82,10 @@ npm start
 | Usuarios | CRUD y roles | Administración | `admin` |
 | Categorías | CRUD y protección de borrado | CRUD | `admin` |
 | Temporadas | CRUD y validación de fechas | CRUD | Lectura autenticada, mutación `admin` |
-| Equipos | CRUD por temporada/categoría | CRUD y navegación a plantilla | Lectura autenticada, mutación `admin` |
+| Equipos | CRUD por temporada/categoría; modalidad antropométrica configurable | CRUD, configuración de modalidad para `admin` y navegación a plantilla | Lectura autenticada, mutación `admin` |
 | Jugadores | CRUD, detalle relacional y foto | Listado, CRUD y ficha | Lectura autenticada, mutación `admin` |
 | Jugador-equipo | Asignación individual/en bloque y baja lógica | Dual listbox | Lectura autenticada, mutación `admin` |
-| Antropometría | Crear, historial por jugador y cálculo | Stepper ISAK y somatocarta | `admin`, `usuario` |
+| Antropometría | Crear, historial por jugador y cálculo ISAK; persistencia de BASICA | Captura BASICA/ISAK según equipo, selector explícito de equipo, historial y somatocarta ISAK | `admin`, `usuario` |
 | Lesiones | Solo modelo Prisma | Sin pantalla | Pendiente |
 | Posiciones | Solo modelo Prisma, sin FK a jugador | Sin pantalla | Pendiente |
 
@@ -110,9 +112,15 @@ La fotografía no se almacena como `BYTEA` ni como base64 en PostgreSQL. El endp
 
 El directorio está en `.gitignore`. El servicio elimina la foto local anterior cuando se reemplaza o elimina el jugador. Para producción se recomienda sustituir el almacenamiento local por Blob Storage, S3 o CDN y conservar la misma idea de guardar únicamente una URL.
 
-### Antropometría ISAK
+### Antropometría BASICA e ISAK
 
-El stepper frontend envía medidas brutas en una única petición `POST /api/mediciones-antropometricas`. El servidor calcula:
+La modalidad se configura en el equipo. Solo `admin` puede modificarla; los equipos existentes se inicializaron como ISAK y los nuevos usan BASICA por defecto. La versión de configuración aumenta cuando cambia la modalidad para detectar formularios desactualizados.
+
+Con pertenencias activas, la persona evaluadora selecciona explícitamente el equipo y su protocolo vigente; el sistema no elige automáticamente entre equipos. La fecha de medición debe quedar dentro de las fechas de pertenencia. Si no hay equipos activos, se puede elegir BASICA o ISAK y guardar sin equipo, salvo que la fecha corresponda a una pertenencia ya finalizada. El endpoint valida contexto y registra la medición dentro de una transacción serializable.
+
+BASICA recoge peso y talla obligatorios, cintura y observaciones opcionales. No calcula ni almacena porcentaje de grasa, músculo, sumatorias, somatotipo o somatocarta. ISAK exige los seis pliegues principales y conserva las medidas opcionales y resultados calculados existentes. El frontend muestra un formulario adaptado a cada protocolo y el historial indica protocolo y equipo.
+
+El stepper frontend envía medidas brutas en una única petición `POST /api/mediciones-antropometricas`. Para ISAK, el servidor calcula:
 
 - Sumatoria de seis pliegues.
 - Sumatoria de ocho pliegues si existen bicipital y cresta ilíaca.
@@ -120,11 +128,11 @@ El stepper frontend envía medidas brutas en una única petición `POST /api/med
 - Endomorfia y ectomorfia Heath-Carter.
 - Mesomorfia y coordenadas de somatocarta cuando están las medidas requeridas.
 
-El evaluador se obtiene del JWT (`request.user.id_usuario`) y no se acepta desde el cliente. El historial se consulta con `GET /api/mediciones-antropometricas/jugador/:idJugador` y se ordena por fecha descendente.
+El evaluador se obtiene del JWT (`request.user.id_usuario`) y no se acepta desde el cliente. El historial se consulta con `GET /api/mediciones-antropometricas/jugador/:idJugador` y se ordena por fecha descendente. Cada registro conserva protocolo y equipo de origen; cambiar la configuración no recalcula ni modifica el historial.
 
 ## 4. Frontend y rutas
 
-Las rutas privadas se renderizan dentro de `Layout`, que contiene sidebar, header y área de trabajo. `RequireAuth` exige token; `RequireAdmin` exige rol `admin`; `RequireEvaluator` permite `admin` y `usuario` para la creación antropométrica.
+Las rutas privadas se renderizan dentro de `Layout`, que contiene sidebar, header y área de trabajo. `RequireAuth` exige token; `RequireAdmin` exige rol `admin`; `RequireEvaluator` permite `admin` y `usuario` para la creación antropométrica. La edición de equipo permite a administradores configurar la modalidad antropométrica.
 
 Rutas relevantes:
 
@@ -156,10 +164,11 @@ El esquema Prisma contiene:
 - `jugador`: identidad deportiva, foto como ruta y relaciones.
 - `jugador_equipo`: pertenencia histórica, dorsal y estado activo.
 - `lesion`: información médica básica.
-- `medicion_antropometrica`: protocolo ISAK y resultados derivados.
+- `equipo`: protocolo antropométrico vigente y versión de configuración.
+- `medicion_antropometrica`: protocolo utilizado, equipo de origen opcional, medidas compartidas y resultados derivados nullable según modalidad. Los pliegues ISAK son nullable en el esquema para admitir BASICA, pero ISAK los exige en DTO y servicio.
 - `posicion`: catálogo todavía no relacionado con jugador.
 
-La migración `20260922120000_mediciones_antropometricas_isak` transforma el modelo antropométrico inicial. Se detiene si encuentra registros previos porque faltan datos obligatorios del nuevo protocolo y no es seguro inventar pliegues ni evaluador.
+La migración `20260922120000_mediciones_antropometricas_isak` transforma el modelo antropométrico inicial y se detiene si detecta registros antiguos que no se pueden atribuir de forma segura. La migración `20261006160000_protocolos_antropometricos` agrega las modalidades por equipo y medición, cambia los seis pliegues a nullable y conserva los registros anteriores como ISAK sin recalcularlos ni atribuirles equipo.
 
 Migraciones:
 
@@ -169,6 +178,8 @@ Migraciones:
 20260914110403_auth_roles_users
 20260916090000_categorias_equipos
 20260922120000_mediciones_antropometricas_isak
+20260930120000_lesion_readaptacion
+20261006160000_protocolos_antropometricos
 ```
 
 ## 6. Decisiones recientes
@@ -187,7 +198,7 @@ La BD mantiene una referencia ligera y reemplazable. Guardar binarios en Postgre
 
 ### Datos antiguos antropométricos
 
-La migración no intenta convertir mediciones incompletas. Si una base contiene datos antiguos, debe respaldarse y definirse una estrategia de normalización antes de aplicar la migración ISAK.
+La migración de modalidades marca los equipos y mediciones existentes como ISAK. Las mediciones antiguas quedan sin equipo porque no se puede inferir su plantilla de origen; sus medidas y resultados se conservan sin recálculo. Los equipos nuevos se crean en BASICA. El borrado físico de equipos se rechaza y la relación medición-equipo usa `Restrict` para proteger el historial.
 
 ## 7. Seguridad y operación
 
@@ -211,13 +222,14 @@ Pendiente:
 
 ## 8. Calidad y pruebas
 
-Validación de referencia del 2026-09-23:
+Validación ejecutada durante la revisión del 2026-10-06:
 
 ```text
 Backend build: correcto
-Backend test: 25 tests correctos en 8 archivos
+Backend test: 53 tests correctos en 10 archivos
 Backend lint: correcto
 Frontend build: correcto
+Backend e2e protegido: 51 tests correctos en 1 archivo (Prisma mock)
 ```
 
 Las pruebas unitarias recientes cubren:
@@ -228,10 +240,11 @@ Las pruebas unitarias recientes cubren:
 - Rechazo de jugador inexistente al crear una medición.
 - Includes y ordenación de la ficha ampliada.
 - Reglas de negocio previas de categorías, temporadas, usuarios, jugadores y plantillas.
+- Protocolos BASICA/ISAK, validación condicional, pertenencia y fecha, conflicto por configuración obsoleta y conservación del historial al reconfigurar equipos.
 
-Los tests e2e protegidos mockean Prisma y cubren autenticación, roles, DTOs y login. El e2e histórico de la aplicación requiere PostgreSQL real.
+Los tests e2e protegidos mockean Prisma y cubren autenticación, roles, DTOs, protocolos, configuración de equipo y login. La prueba de migración `protocolos-antropometricos-migration.e2e-spec.ts` aplica migraciones en un esquema PostgreSQL aislado; requiere `DATABASE_URL` y se habilita explícitamente mediante `TEST_PROTOCOL_MIGRATION=1`. No se ejecutó en la revisión indicada. No hay tests automatizados de componentes o flujos frontend.
 
-No hay todavía tests automatizados de componentes o flujos del frontend; la revisión visual de la ficha y el stepper se realiza manualmente en `http://localhost:5173`.
+La compilación de frontend y backend, los tests unitarios y el lint pasaron durante esa revisión. Los builds no sustituyen la comprobación manual de los recorridos en navegador.
 
 ## 9. Riesgos y pendientes
 
@@ -243,6 +256,9 @@ No hay todavía tests automatizados de componentes o flujos del frontend; la rev
 6. La masa muscular no se persiste porque falta una fórmula y variables validadas.
 7. Persisten riesgos de `localStorage`, falta de Helmet y dependencias con rangos `latest` en frontend.
 8. No hay tests frontend automatizados.
+9. La selección y posterior deselección de un equipo mientras su configuración está cargando puede dejar bloqueado el estado de carga del formulario antropométrico.
+10. Una edición de equipo abierta en una sesión antigua puede sobrescribir una modalidad modificada en otra sesión; la versión evita conflictos al registrar mediciones, pero la edición administrativa no envía la versión originalmente leída.
+11. La ficha del jugador no muestra el perímetro de cintura de mediciones BASICA y mantiene indicadores ISAK vacíos en el resumen básico.
 
 ## 10. Roadmap
 

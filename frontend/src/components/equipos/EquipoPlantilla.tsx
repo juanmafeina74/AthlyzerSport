@@ -20,7 +20,8 @@ interface JugadorMiniCardProps {
 
 function JugadorMiniCard({ seleccionado, onToggle, titulo, subtitulo }: JugadorMiniCardProps) {
   return (
-    <button
+    <Button
+      unstyled
       type="button"
       onClick={onToggle}
       className={`w-full rounded-lg border px-3 py-2 text-left shadow-soft transition-colors ${
@@ -31,7 +32,7 @@ function JugadorMiniCard({ seleccionado, onToggle, titulo, subtitulo }: JugadorM
     >
       <p className="font-medium text-gray-900">{titulo}</p>
       <p className="text-sm text-gray-600">{subtitulo}</p>
-    </button>
+    </Button>
   );
 }
 
@@ -58,7 +59,9 @@ export default function EquipoPlantilla() {
   }, [equipoId, search]);
 
   useEffect(() => {
-    equiposService.getById(equipoId).then((eq) => setEquipoNombre(eq.nombre));
+    equiposService.getById(equipoId)
+      .then((eq) => setEquipoNombre(eq.nombre))
+      .catch((cause: Error) => setError(cause.message));
   }, [equipoId]);
 
   useEffect(() => {

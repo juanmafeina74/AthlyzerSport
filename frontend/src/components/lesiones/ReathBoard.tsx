@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import jugadoresService from "../services/jugadores.service";
 import { lesionesService, type Lesion } from "../services/lesiones.service";
+import Button from "../ui/button";
 import BodyMap from "./BodyMap";
 
 type Player = { id_jugador: number; nombre: string; apellidos: string };
@@ -29,7 +30,7 @@ export default function ReathBoard() {
   const [dropPhase, setDropPhase] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [showForm, setShowForm] = useState(Boolean(searchParams.get("jugador")));
+  const [showForm, setShowForm] = useState(Boolean(searchParams.get("jugador") || searchParams.get("nueva")));
   const [form, setForm] = useState({ id_jugador: searchParams.get("jugador") ?? "", fecha_inicio: today(), tipo_lesion: "", zona_corporal: "", observaciones: "" });
 
   useEffect(() => {
@@ -88,10 +89,9 @@ export default function ReathBoard() {
           <h1 className="text-2xl font-bold text-gray-900">Lesiones y readaptación</h1>
           <p className="mt-1 text-sm text-gray-600">{active.length} en seguimiento · {discharged.length} altas registradas</p>
         </div>
-        <button type="button" onClick={() => { setShowForm((open) => !open); setError(""); }}
-          className="rounded bg-brand-dark px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+        <Button type="button" onClick={() => { setShowForm((open) => !open); setError(""); }}>
           {showForm ? "Cerrar registro" : "+ Nueva lesión"}
-        </button>
+        </Button>
       </header>
 
       {error && <p role="alert" className="rounded bg-red-100 px-4 py-3 text-sm text-red-800">{error}</p>}
@@ -120,9 +120,9 @@ export default function ReathBoard() {
               <textarea rows={3} value={form.observaciones} onChange={(event) => setForm({ ...form, observaciones: event.target.value })}
                 className="mt-1 block w-full rounded border border-gray-300 p-2 focus:outline-teal-700" />
             </label>
-            <button type="submit" disabled={saving || !form.zona_corporal} className="self-end rounded bg-teal-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-start">
+            <Button unstyled type="submit" disabled={saving || !form.zona_corporal} className="self-end rounded bg-teal-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-start">
               {saving ? "Guardando..." : "Registrar lesión"}
-            </button>
+            </Button>
           </div>
           <BodyMap value={form.zona_corporal} onChange={(zone) => setForm((current) => ({ ...current, zona_corporal: zone }))} />
         </form>

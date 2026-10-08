@@ -27,6 +27,7 @@ export default {
 
   getPlantilla: async (idEquipo: number) => {
     const response = await fetch(`${API}/${idEquipo}/plantilla`, { headers: authHeaders() });
+    if (!response.ok) throw new Error("No se pudo cargar la plantilla del equipo.");
     return (await response.json()) as PlantillaEntry[];
   },
 

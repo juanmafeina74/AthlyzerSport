@@ -16,7 +16,7 @@ export default function LoginPage() {
     try {
       const user = await login(email, password);
       localStorage.setItem("athlyzer_user", JSON.stringify(user));
-      window.location.href = user.role === "admin" ? "/admin" : "/dashboard";
+      window.location.href = "/dashboard";
     } catch (err: any) {
       setError(err?.message ?? "No se pudo iniciar sesión.");
     }

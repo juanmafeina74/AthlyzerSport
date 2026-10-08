@@ -21,9 +21,12 @@ type TeamAssignment = {
 
 type Measurement = {
   id_medicion: number;
+  id_equipo: number | null;
+  protocolo: "BASICA" | "ISAK";
   fecha: string;
   peso_kg: number;
   talla_cm: number;
+  perimetro_cintura: number | null;
   sumatoria_6_pliegues: number | null;
   porcentaje_grasa: number | null;
   somatotipo_endomorfia: number | null;
@@ -151,6 +154,9 @@ export default function JugadorDetail() {
   const currentTeams = player.jugador_equipo.filter((assignment) => assignment.activo);
   const previousTeams = player.jugador_equipo.filter((assignment) => !assignment.activo);
   const latestMeasurement = player.medicion_antropometrica[0];
+  const teamNames = new Map(player.jugador_equipo.map((assignment) => [assignment.equipo.id_equipo, assignment.equipo.nombre]));
+  const teamLabel = (idEquipo: number | null) => idEquipo == null ? "Sin equipo" : teamNames.get(idEquipo) ?? `Equipo ${idEquipo}`;
+  const result = (value: number | null, digits = 1) => value == null ? "Sin resultado" : value.toFixed(digits);
   const activeInjuries = player.lesion.filter((injury) => !injury.alta_medica);
   const photoUrl = resolvePhoto(player.foto);
   const initials = `${player.nombre.charAt(0)}${player.apellidos.charAt(0)}`.toUpperCase();
@@ -226,17 +232,17 @@ export default function JugadorDetail() {
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
                   <Stat label="Peso" value={latestMeasurement.peso_kg.toFixed(1)} unit="kg" />
                   <Stat label="Talla" value={latestMeasurement.talla_cm.toFixed(1)} unit="cm" />
-                  <Stat label="Grasa" value={latestMeasurement.porcentaje_grasa?.toFixed(1) ?? "—"} unit={latestMeasurement.porcentaje_grasa != null ? "%" : undefined} />
-                  <Stat label="Σ 6 pliegues" value={latestMeasurement.sumatoria_6_pliegues?.toFixed(1) ?? "—"} unit={latestMeasurement.sumatoria_6_pliegues != null ? "mm" : undefined} />
+                  <Stat label="Grasa" value={result(latestMeasurement.porcentaje_grasa)} unit={latestMeasurement.porcentaje_grasa != null ? "%" : undefined} />
+                  <Stat label="Σ 6 pliegues" value={result(latestMeasurement.sumatoria_6_pliegues)} unit={latestMeasurement.sumatoria_6_pliegues != null ? "mm" : undefined} />
                 </div>
-                <p className="mt-5 text-xs text-gray-500">Última medición: {formatDate(latestMeasurement.fecha)} · Evaluador: {latestMeasurement.evaluador.nombre}</p>
+                <p className="mt-5 text-xs text-gray-500">Última medición: {formatDate(latestMeasurement.fecha)} · Protocolo {latestMeasurement.protocolo} · {teamLabel(latestMeasurement.id_equipo)} · Evaluador: {latestMeasurement.evaluador.nombre}</p>
                 {player.medicion_antropometrica.length > 1 && (
                   <div className="mt-5 overflow-x-auto border-t border-gray-200 pt-4">
-                    <table className="w-full min-w-[520px] text-left text-sm">
-                      <thead className="text-xs uppercase text-gray-500"><tr><th className="pb-2">Fecha</th><th className="pb-2">Peso</th><th className="pb-2">Grasa</th><th className="pb-2">Somatotipo</th></tr></thead>
+                    <table className="w-full min-w-[640px] text-left text-sm">
+                      <thead className="text-xs uppercase text-gray-500"><tr><th className="pb-2">Fecha</th><th className="pb-2">Protocolo</th><th className="pb-2">Equipo</th><th className="pb-2">Peso</th><th className="pb-2">Grasa</th><th className="pb-2">Somatotipo</th></tr></thead>
                       <tbody className="divide-y divide-gray-100">
                         {player.medicion_antropometrica.slice(1).map((measurement) => (
-                          <tr key={measurement.id_medicion}><td className="py-3">{formatDate(measurement.fecha)}</td><td>{measurement.peso_kg.toFixed(1)} kg</td><td>{measurement.porcentaje_grasa?.toFixed(1) ?? "—"}%</td><td>{[measurement.somatotipo_endomorfia, measurement.somatotipo_mesomorfia, measurement.somatotipo_ectomorfia].map((value) => value?.toFixed(1) ?? "—").join(" · ")}</td></tr>
+                          <tr key={measurement.id_medicion}><td className="py-3">{formatDate(measurement.fecha)}</td><td>{measurement.protocolo}</td><td>{teamLabel(measurement.id_equipo)}</td><td>{measurement.peso_kg.toFixed(1)} kg</td><td>{measurement.porcentaje_grasa == null ? "Sin resultado" : `${measurement.porcentaje_grasa.toFixed(1)} %`}</td><td>{[measurement.somatotipo_endomorfia, measurement.somatotipo_mesomorfia, measurement.somatotipo_ectomorfia].every((value) => value == null) ? "Sin resultado" : [measurement.somatotipo_endomorfia, measurement.somatotipo_mesomorfia, measurement.somatotipo_ectomorfia].map((value) => value?.toFixed(1) ?? "—").join(" · ")}</td></tr>
                         ))}
                       </tbody>
                     </table>

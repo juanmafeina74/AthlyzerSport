@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, ProtocoloAntropometrico } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateEquipoDto } from './dto/create-equipo.dto.js';
 import { UpdateEquipoDto } from './dto/update-equipo.dto.js';
@@ -60,6 +60,7 @@ export class EquiposService {
       data: {
         id_temporada: requestedTemporada,
         nombre: data.nombre,
+        protocolo_antropometrico: data.protocolo_antropometrico ?? ProtocoloAntropometrico.BASICA,
         id_categoria: requestedCategoria ?? null,
         fecha_creacion: data.fecha_creacion
           ? new Date(data.fecha_creacion)
@@ -69,9 +70,16 @@ export class EquiposService {
   }
 
   async update(id: number, data: UpdateEquipoDto) {
-    await this.findOne(id);
+    const equipo = await this.findOne(id);
 
     const updateData: Prisma.equipoUncheckedUpdateInput = {};
+
+    if (data.protocolo_antropometrico !== undefined) {
+      updateData.protocolo_antropometrico = data.protocolo_antropometrico;
+      if (data.protocolo_antropometrico !== equipo.protocolo_antropometrico) {
+        updateData.version_protocolo_antropometrico = { increment: 1 };
+      }
+    }
 
     if (data.id_temporada !== undefined) {
       updateData.id_temporada = data.id_temporada;
@@ -101,15 +109,28 @@ export class EquiposService {
       updateData.fecha_creacion = new Date(data.fecha_creacion);
     }
 
-    return this.prisma.equipo.update({
-      where: { id_equipo: id },
-      data: updateData,
-      include: { categoria: true },
-    });
+    try {
+      return await this.prisma.equipo.update({
+        where: {
+          id_equipo: id,
+          ...(data.protocolo_antropometrico !== undefined
+            ? { version_protocolo_antropometrico: equipo.version_protocolo_antropometrico }
+            : {}),
+        },
+        data: updateData,
+        include: { categoria: true },
+      });
+    } catch (error) {
+      if (data.protocolo_antropometrico !== undefined &&
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new ConflictException('La configuración del equipo ha cambiado. Recarga los datos e inténtalo de nuevo.');
+      }
+      throw error;
+    }
   }
 
   async remove(id: number) {
     await this.findOne(id);
-    return this.prisma.equipo.delete({ where: { id_equipo: id } });
+    throw new ConflictException('No se permite el borrado físico de equipos. Se conservan sus vínculos históricos.');
   }
 }

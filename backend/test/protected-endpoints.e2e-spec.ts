@@ -138,6 +138,147 @@ describe('Endpoints protegidos: equipos y usuarios (e2e)', () => {
   });
 });
 
+describe('Modalidades antropométricas (e2e)', () => {
+  const prismaMock = {
+    jugador: { findUnique: vi.fn() },
+    equipo: { findUnique: vi.fn(), updateMany: vi.fn(), update: vi.fn(), create: vi.fn(), delete: vi.fn() },
+    temporada: { findUnique: vi.fn() },
+    jugador_equipo: { findFirst: vi.fn(), findMany: vi.fn() },
+    medicion_antropometrica: { create: vi.fn(), findMany: vi.fn() },
+    $transaction: vi.fn(),
+  };
+  const basic = { id_jugador: 4, protocolo: 'BASICA', peso_kg: 74.5, talla_cm: 178 };
+  let app: Awaited<ReturnType<typeof createApp>>;
+
+  beforeAll(async () => {
+    app = await createApp(prismaMock);
+  });
+
+  beforeEach(() => {
+    prismaMock.$transaction.mockReset();
+    for (const model of [prismaMock.jugador, prismaMock.equipo, prismaMock.temporada,
+      prismaMock.jugador_equipo, prismaMock.medicion_antropometrica]) {
+      for (const method of Object.values(model)) {
+        method.mockReset();
+      }
+    }
+    prismaMock.$transaction.mockImplementation((callback) => callback(prismaMock));
+    prismaMock.jugador.findUnique.mockResolvedValue({ id_jugador: 4 });
+    prismaMock.equipo.findUnique.mockResolvedValue({
+      id_equipo: 1, protocolo_antropometrico: 'BASICA', version_protocolo_antropometrico: 1,
+    });
+    prismaMock.equipo.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.jugador_equipo.findFirst.mockResolvedValue({ activo: true });
+    prismaMock.jugador_equipo.findMany.mockResolvedValue([]);
+    prismaMock.medicion_antropometrica.create.mockImplementation(({ data }) => ({ id_medicion: 1, ...data }));
+    prismaMock.temporada.findUnique.mockResolvedValue({ id_temporada: 1 });
+    prismaMock.equipo.create.mockImplementation(({ data }) => ({ id_equipo: 1, ...data }));
+    prismaMock.equipo.update.mockImplementation(({ data }) => ({ id_equipo: 1, ...data }));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('exige autenticación para registrar mediciones', () => {
+    return request(app.getHttpServer()).post('/api/mediciones-antropometricas').send(basic).expect(401);
+  });
+
+  it('no permite al rol jugador registrar mediciones', () => {
+    return request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('jugador')}`).send(basic).expect(403);
+  });
+
+  it.each(['admin', 'usuario'] as const)('permite BASICA sin equipo a %s y toma el evaluador del JWT', async (role) => {
+    const response = await request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor(role)}`).send(basic).expect(201);
+    expect(response.body).toMatchObject({ id_equipo: null, protocolo: 'BASICA', id_evaluador: 1, porcentaje_grasa: null });
+  });
+
+  it.each(['id_evaluador', 'porcentaje_grasa', 'sumatoria_6_pliegues', 'somatotipo_endomorfia'])('rechaza el campo no confiable %s', async (field) => {
+    await request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`).send({ ...basic, [field]: 99 }).expect(400);
+    expect(prismaMock.medicion_antropometrica.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza ISAK sin pliegues obligatorios', async () => {
+    await request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`).send({ ...basic, protocolo: 'ISAK' }).expect(400);
+    expect(prismaMock.medicion_antropometrica.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza BASICA con medidas exclusivas de ISAK', () => {
+    return request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`).send({ ...basic, talla_sentado_cm: 90 }).expect(400);
+  });
+
+  it('exige versión cuando se selecciona un equipo', () => {
+    return request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`).send({ ...basic, id_equipo: 1 }).expect(400);
+  });
+
+  it('rechaza una versión de configuración sin equipo', () => {
+    return request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`).send({ ...basic, version_protocolo_antropometrico: 1 }).expect(400);
+  });
+
+  it('devuelve 409 sin insertar al cambiar la modalidad durante la captura', async () => {
+    prismaMock.equipo.updateMany.mockResolvedValue({ count: 0 });
+    await request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`)
+      .send({ ...basic, id_equipo: 1, version_protocolo_antropometrico: 1 }).expect(409);
+    expect(prismaMock.medicion_antropometrica.create).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una pertenencia no activa al equipo elegido', async () => {
+    prismaMock.jugador_equipo.findFirst.mockResolvedValue(null);
+    await request(app.getHttpServer()).post('/api/mediciones-antropometricas')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`)
+      .send({ ...basic, id_equipo: 1, version_protocolo_antropometrico: 1 }).expect(400);
+    expect(prismaMock.medicion_antropometrica.create).not.toHaveBeenCalled();
+  });
+
+  it('solo admin puede configurar la modalidad del equipo', () => {
+    return request(app.getHttpServer()).put('/api/equipos/1')
+      .set('Authorization', `Bearer ${tokenFor('usuario')}`).send({ protocolo_antropometrico: 'ISAK' }).expect(403);
+  });
+
+  it('permite a admin configurar ISAK', async () => {
+    await request(app.getHttpServer()).put('/api/equipos/1')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`).send({ protocolo_antropometrico: 'ISAK' }).expect(200);
+    expect(prismaMock.equipo.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: { protocolo_antropometrico: 'ISAK', version_protocolo_antropometrico: { increment: 1 } },
+    }));
+  });
+
+  it('rechaza modalidades inválidas al configurar el equipo', () => {
+    return request(app.getHttpServer()).put('/api/equipos/1')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`).send({ protocolo_antropometrico: 'OTRO' }).expect(400);
+  });
+
+  it('rechaza null como modalidad al configurar el equipo', () => {
+    return request(app.getHttpServer()).put('/api/equipos/1')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`).send({ protocolo_antropometrico: null }).expect(400);
+  });
+
+  it('no permite modificar la versión desde el cliente', () => {
+    return request(app.getHttpServer()).put('/api/equipos/1')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`).send({ version_protocolo_antropometrico: 99 }).expect(400);
+  });
+
+  it('crea equipos como BASICA por defecto', async () => {
+    const response = await request(app.getHttpServer()).post('/api/equipos')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`).send({ nombre: 'Equipo', id_temporada: 1 }).expect(201);
+    expect(response.body.protocolo_antropometrico).toBe('BASICA');
+  });
+
+  it('impide el borrado físico del equipo incluso a admin', async () => {
+    await request(app.getHttpServer()).delete('/api/equipos/1')
+      .set('Authorization', `Bearer ${tokenFor('admin')}`).expect(409);
+    expect(prismaMock.equipo.delete).not.toHaveBeenCalled();
+  });
+});
+
 describe('Auth login: casos de negocio (e2e)', () => {
   const prismaMock = {
     usuario: { findUnique: vi.fn() },

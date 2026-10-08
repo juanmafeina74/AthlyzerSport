@@ -1,12 +1,10 @@
 import { authHeaders } from "./auth.service";
+import { toApiError } from "./apiError";
+import type { ProtocoloAntropometrico } from "./equipos.service";
 
 const API = "http://localhost:3000/api/mediciones-antropometricas";
 
-export type MedicionAntropometricaInput = {
-  id_jugador: number;
-  fecha: string;
-  peso_kg: number;
-  talla_cm: number;
+export type IsakMeasurements = {
   talla_sentado_cm?: number;
   pliegue_tricipital: number;
   pliegue_subescapular: number;
@@ -18,35 +16,59 @@ export type MedicionAntropometricaInput = {
   pliegue_cresta_iliaca?: number;
   perimetro_brazo_relajado?: number;
   perimetro_brazo_flexionado?: number;
-  perimetro_cintura?: number;
   perimetro_cadera?: number;
   perimetro_muslo_medio?: number;
   perimetro_pantorrilla?: number;
   diametro_biepicondilar_humero?: number;
   diametro_biepicondilar_femur?: number;
   diametro_biestiloideo?: number;
-  observaciones?: string;
 };
 
-export type MedicionAntropometrica = MedicionAntropometricaInput & {
+type CommonInput = {
+  id_jugador: number;
+  fecha?: string;
+  peso_kg: number;
+  talla_cm: number;
+  perimetro_cintura?: number;
+  observaciones?: string;
+  id_equipo?: number;
+  version_protocolo_antropometrico?: number;
+};
+
+export type MedicionAntropometricaInput =
+  | (CommonInput & { protocolo: "BASICA" })
+  | (CommonInput & IsakMeasurements & { protocolo: "ISAK" });
+
+type Nullable<T> = { [K in keyof T]-?: T[K] | null };
+
+export type MedicionAntropometrica = Nullable<IsakMeasurements> & {
   id_medicion: number;
+  id_jugador: number;
+  id_equipo: number | null;
   id_evaluador: number;
-  sumatoria_6_pliegues: number;
-  sumatoria_8_pliegues?: number | null;
-  porcentaje_grasa: number;
-  porcentaje_musculo?: number | null;
-  somatotipo_endomorfia: number;
-  somatotipo_mesomorfia?: number | null;
-  somatotipo_ectomorfia: number;
-  somatocarta_x?: number | null;
-  somatocarta_y?: number | null;
+  protocolo: ProtocoloAntropometrico;
+  fecha: string;
+  peso_kg: number;
+  talla_cm: number;
+  perimetro_cintura: number | null;
+  observaciones: string | null;
+  sumatoria_6_pliegues: number | null;
+  sumatoria_8_pliegues: number | null;
+  porcentaje_grasa: number | null;
+  porcentaje_musculo: number | null;
+  somatotipo_endomorfia: number | null;
+  somatotipo_mesomorfia: number | null;
+  somatotipo_ectomorfia: number | null;
+  somatocarta_x: number | null;
+  somatocarta_y: number | null;
+  evaluador?: { id_usuario: number; nombre: string };
 };
 
 async function getByPlayer(idJugador: number): Promise<MedicionAntropometrica[]> {
   const response = await fetch(`${API}/jugador/${idJugador}`, { headers: authHeaders() });
 
   if (!response.ok) {
-    throw new Error("No se pudo cargar el historial antropométrico.");
+    throw await toApiError(response, "No se pudo cargar el historial antropométrico.");
   }
 
   return response.json();

@@ -9,7 +9,6 @@ import CategoriaList from "./components/categorias/CategoriaList";
 import EquipoList from "./components/equipos/EquipoList";
 import EquipoCreate from "./components/equipos/EquipoCreate";
 import EquipoEdit from "./components/equipos/EquipoEdit";
-import EquipoDelete from "./components/equipos/EquipoDelete";
 import EquipoPlantilla from "./components/equipos/EquipoPlantilla";
 import JugadorDelete from "./components/jugadores/JugadorDelete";
 import JugadorList from "./components/jugadores/JugadorList";
@@ -91,7 +90,7 @@ export default function Router() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<RouteFallback />} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
         <Route path="/categorias" element={<RequireAdmin><CategoriaList /></RequireAdmin>} />
@@ -105,7 +104,6 @@ export default function Router() {
         <Route path="/equipos" element={<RequireAuth><EquipoList /></RequireAuth>} />
         <Route path="/equipos/crear" element={<RequireAuth><EquipoCreate /></RequireAuth>} />
         <Route path="/equipos/editar/:id" element={<RequireAuth><EquipoEdit /></RequireAuth>} />
-        <Route path="/equipos/borrar/:id" element={<RequireAuth><EquipoDelete /></RequireAuth>} />
         <Route path="/equipos/plantilla/:id" element={<RequireAuth><EquipoPlantilla /></RequireAuth>} />
         <Route path="/jugadores" element={<RequireAuth><JugadorList /></RequireAuth>} />
         <Route path="/jugadores/:id" element={<RequireAuth><JugadorDetail /></RequireAuth>} />

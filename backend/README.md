@@ -72,7 +72,7 @@ Módulos principales:
 - `equipos`: equipos por temporada y categoría.
 - `jugadores`: CRUD, ficha ampliada y fotografía.
 - `jugador-equipo`: asignación y baja lógica de jugadores en plantillas.
-- `mediciones-antropometricas`: protocolo ISAK, cálculos y auditoría del evaluador.
+- `mediciones-antropometricas`: modalidades BASICA/ISAK, cálculos y auditoría del evaluador.
 - `temporadas`: temporadas deportivas.
 - `usuarios`: administración de usuarios y roles.
 - `common`: filtro global de errores de Prisma.
@@ -133,7 +133,54 @@ GET  /api/mediciones-antropometricas/jugador/:idJugador  admin, usuario
 POST /api/mediciones-antropometricas                     admin, usuario
 ```
 
-El `POST` recibe datos brutos del protocolo ISAK. El servicio calcula y persiste sumatoria de seis/ocho pliegues cuando corresponde, porcentaje de grasa mediante Faulkner y componentes Heath-Carter disponibles. `id_evaluador` se obtiene de `request.user.id_usuario`, no del body.
+El `POST` devuelve `201` y recibe medidas brutas. Campos comunes:
+
+- `id_jugador`: entero positivo obligatorio.
+- `protocolo`: `BASICA` o `ISAK`, obligatorio.
+- `id_equipo`: entero positivo o `null`; puede omitirse solo si el jugador no tiene pertenencias activas.
+- `version_protocolo_antropometrico`: entero positivo obligatorio con equipo; no se admite sin equipo.
+- `fecha`: ISO 8601 opcional; por defecto, instante del registro.
+- `peso_kg`, `talla_cm`: números obligatorios, mínimo `0.1` y máximo dos decimales.
+- `perimetro_cintura`: número opcional con las mismas restricciones; `observaciones`: texto opcional.
+
+En `BASICA` no se admiten talla sentado, pliegues, otros perímetros ni diámetros. Todos los resultados derivados (sumatorias, grasa, músculo, somatotipo y somatocarta) permanecen en `null`.
+
+En `ISAK` se exigen `pliegue_tricipital`, `pliegue_subescapular`, `pliegue_supraespinal`, `pliegue_abdominal`, `pliegue_muslo` y `pliegue_pantorrilla`, con mínimo `0.1` y máximo dos decimales. El resto de medidas ISAK conserva su carácter opcional. El servicio calcula sumatorias de seis/ocho pliegues cuando corresponde, porcentaje de grasa mediante Faulkner y componentes Heath-Carter disponibles. No calcula masa muscular.
+
+`id_evaluador` se obtiene del JWT. El cliente no puede enviar evaluador ni resultados derivados.
+
+Ejemplo BASICA con equipo seleccionado:
+
+```json
+{
+  "id_jugador": 4,
+  "id_equipo": 2,
+  "protocolo": "BASICA",
+  "version_protocolo_antropometrico": 1,
+  "fecha": "2026-10-06T10:00:00Z",
+  "peso_kg": 74.5,
+  "talla_cm": 178,
+  "perimetro_cintura": 80
+}
+```
+
+Sin equipos activos, se omiten `id_equipo` y la versión; el evaluador elige explícitamente el protocolo. No se permite registrar como "sin equipo" una fecha cubierta por una pertenencia ya finalizada.
+
+Con equipo, el servidor exige pertenencia activa y que sus fechas cubran el día de medición (día UTC; límites inclusivos). No se admiten registros de pertenencias finalizadas ni fechas anteriores al inicio de la pertenencia activa. Si hay varias pertenencias activas, el cliente debe seleccionar una: el servidor nunca elige la primera.
+
+Errores aplicables: `400` para medidas/contexto/pertenencia inválidos; `404` para jugador o equipo inexistentes; `409` para modalidad/versión desactualizadas o conflicto concurrente; `401`/`403` según autenticación y roles. La comprobación y escritura se realizan en una transacción serializable, bloqueando la configuración del equipo durante el registro. Un `409` requiere recargar el contexto antes de reintentar.
+
+Las respuestas de alta e historial incluyen `protocolo`, `id_equipo` nullable y los resultados persistidos. El historial no se recalcula ni cambia al modificar una configuración o pertenencia.
+
+### Configuración antropométrica de equipos
+
+`GET /api/equipos` y `GET /api/equipos/:id` incluyen `protocolo_antropometrico` y `version_protocolo_antropometrico`. El formulario debe guardar ambos valores al abrirse y enviarlos en el registro con equipo.
+
+`POST /api/equipos` y `PUT /api/equipos/:id` admiten `protocolo_antropometrico` solo para `admin`. Los equipos nuevos usan `BASICA` por defecto. La versión es administrada por el servidor y se incrementa únicamente al cambiar de modalidad; detecta también cambios ISAK -> BASICA -> ISAK durante la captura.
+
+`DELETE /api/equipos/:id` conserva el permiso `admin`, pero devuelve `409` para cualquier equipo existente: no se permite borrado físico. Las relaciones medición-equipo y equipo-temporada usan `Restrict` para proteger el historial de borrados indirectos. Esto no introduce una desactivación de equipos.
+
+Compatibilidad: el consumidor frontend anterior no envía equipo ni versión y asume resultados ISAK no nulos. Requiere una adaptación separada antes de usar el contrato nuevo con jugadores en plantilla.
 
 ## Lesiones y readaptación
 
@@ -154,7 +201,10 @@ Migraciones actuales:
 20260916090000_categorias_equipos
 20260922120000_mediciones_antropometricas_isak
 20260930120000_lesion_readaptacion
+20261006160000_protocolos_antropometricos
 ```
+
+La migración de protocolos inicializa equipos existentes y mediciones previas como `ISAK`; deja `id_equipo = null` en las mediciones previas, sin deducir un origen ni recalcular resultados. Los seis pliegues pasan a nullable y los equipos creados posteriormente usan `BASICA` por defecto. Aplicar mediante `npm run prisma:migrate` y regenerar el cliente con `npx prisma generate` durante el despliegue coordinado del backend.
 
 ## Calidad
 
@@ -166,6 +216,23 @@ Validación de referencia a 2026-09-23:
 - `npm run test:e2e`: requiere PostgreSQL real para el e2e histórico; los tests protegidos mockean Prisma.
 
 Las pruebas nuevas cubren cálculos antropométricos, persistencia del evaluador autenticado, rechazo de jugador inexistente y carga de relaciones de la ficha ampliada.
+
+Para la validación focalizada de modalidades:
+
+```bash
+npm run test -- src/mediciones-antropometricas/mediciones-antropometricas.service.spec.ts src/equipos/equipos.service.spec.ts
+npm run test:e2e -- test/protected-endpoints.e2e-spec.ts
+```
+
+La prueba real de migración es optativa y necesita PostgreSQL accesible y permisos para crear/eliminar un esquema temporal. En PowerShell:
+
+```powershell
+$env:TEST_PROTOCOL_MIGRATION = '1'
+npm run test:e2e -- test/protocolos-antropometricos-migration.e2e-spec.ts
+Remove-Item Env:TEST_PROTOCOL_MIGRATION
+```
+
+Aplica las migraciones en un esquema aislado con datos ficticios, verifica la conservación de registros previos y el caso del mismo jugador en dos equipos de modalidades distintas, y elimina únicamente ese esquema al finalizar. No aplica la migración en `public`.
 
 ## Pendientes conocidos
 
