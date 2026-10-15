@@ -1,6 +1,6 @@
 # AthLyzer Sports Train
 
-Documentacion de estado del proyecto a fecha 2026-09-23. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
+Documentacion de estado del proyecto a fecha 2026-10-01. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
 
 > Para un analisis tecnico mas detallado (arquitectura, inventario funcional modulo a modulo, riesgos priorizados y roadmap), ver [docs/ANALISIS-PROYECTO.md](docs/ANALISIS-PROYECTO.md).
 
@@ -23,6 +23,7 @@ Estado actual:
 - Ficha ampliada de jugador en `/jugadores/:id`, con acceso por doble clic sobre la card, teclado o boton visible.
 - Subida de fotografia de jugador para administradores; el archivo se almacena fuera de PostgreSQL y la BD conserva solo su ruta publica.
 - Flujo antropometrico ISAK en un stepper de cuatro pasos, con historial previo, calculos reactivos, somatocarta, persistencia y auditoria del evaluador.
+- Gestion de lesiones y readaptacion con registro, mapa anatomico, tablero por fases, cambio de fase y alta medica.
 - Tests de integracion (e2e) que cubren JWT/roles y rate limiting en endpoints protegidos: sin token, token invalido, rol no admin, rol admin y bloqueo por exceso de intentos de login, extendidos a equipos, jugadores, categorias, usuarios, temporadas y a los distintos casos de negocio de `auth.login`.
 - Frontend con rutas privadas: si no hay usuario logado con token, redirige a `/login`.
 - UI unificada alrededor de componentes `Card`, `Button`, `LinkButton`, `FormInput`, `FormSelect` y `FormTextarea`.
@@ -184,6 +185,7 @@ backend/src/
 	equipos/                        # CRUD equipos + DTOs (create/update)
 	jugadores/                      # CRUD jugadores + DTOs (create/update)
 	jugador-equipo/                 # Gestion de plantilla: asignar/quitar jugadores de un equipo
+	lesiones/                       # Registro y readaptacion de lesiones
 	temporadas/                     # CRUD temporadas
 	usuarios/                       # CRUD usuarios y consulta de roles
 ```
@@ -342,6 +344,10 @@ DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin  # quita un jugado
 
 GET    /api/mediciones-antropometricas/jugador/:idJugador  admin, usuario
 POST   /api/mediciones-antropometricas                       admin, usuario
+
+GET    /api/lesiones                              admin, usuario
+POST   /api/lesiones                              admin, usuario
+PATCH  /api/lesiones/:id/fase                    admin, usuario
 ```
 
 ## Validacion de Datos (DTOs)
@@ -402,6 +408,7 @@ backend/prisma/migrations/
 	20260914110403_auth_roles_users/
 	20260916090000_categorias_equipos/
 	20260922120000_mediciones_antropometricas_isak/
+	20260930120000_lesion_readaptacion/
 ```
 
 ## Frontend
@@ -483,6 +490,7 @@ Rutas actuales:
 /jugadores/borrar/:id
 /jugadores/:id
 /mediciones-antropometricas/crear
+/lesiones
 /temporadas
 /temporadas/crear
 /temporadas/editar/:id
@@ -499,6 +507,7 @@ Los servicios estan en `frontend/src/components/services/`.
 - `equipos.service.ts`: llamadas a `/api/equipos`.
 - `jugadores.service.ts`: llamadas a `/api/jugadores`, detalle ampliado y subida de foto.
 - `medicionesAntropometricas.service.ts`: historial y creación de mediciones ISAK.
+- `lesiones.service.ts`: listado, registro y cambio de fase de lesiones.
 - `temporadas.service.ts`: llamadas a `/api/temporadas`.
 
 Los servicios CRUD adjuntan `Authorization: Bearer ...` usando el token guardado en `localStorage`.
@@ -512,11 +521,12 @@ Tokens principales:
 - `brand.dark`: sidebar oscuro.
 - `brand.light`: fondo general.
 - `brand.primary`: azul principal.
-- `brand.secondary`: negro/gris muy oscuro.
-- `brand.accent`: azul claro.
+- `brand.secondary`: azul secundario `#1e40af`.
+- `brand.accent`: azul informativo `#3b82f6`.
 - `panel.bg`: fondo de cards.
 - `panel.border`: borde de paneles.
 - `alert.info`, `alert.warning`, `alert.danger`: fondos de aviso.
+- `status.active`, `status.clear`, `status.pending`, `status.info`: estados médicos y de interfaz.
 
 Componentes UI base:
 
@@ -541,6 +551,7 @@ Pantallas ya alineadas con este sistema:
 - Subida de foto desde la ficha para administradores; JPEG, PNG y WebP hasta 5 MB.
 - Crear, editar y borrar temporadas.
 - Stepper antropometrico de cuatro pasos: contexto, pliegues, perimetros/diametros y revision final.
+- Registro y readaptacion de lesiones: mapa anatomico, tablero de cuatro fases, cambio de fase y altas medicas.
 
 ## Validacion Ejecutada
 
@@ -559,7 +570,7 @@ npm run build
 Resultado conocido:
 
 - Backend build: correcto.
-- Backend tests: correcto, 25 tests pasan en 8 archivos, incluyendo calculos ISAK, auditoria del evaluador y detalle ampliado de jugador.
+- Backend tests: correcto, 31 tests pasan en 9 archivos, incluyendo calculos ISAK, auditoria del evaluador, detalle ampliado de jugador y lesiones.
 - Backend lint: correcto.
 - Frontend build: correcto.
 

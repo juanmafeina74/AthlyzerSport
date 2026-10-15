@@ -261,7 +261,7 @@ export default function JugadorDetail() {
           <section className="rounded-lg border border-panel-border bg-white p-6 shadow-panel">
             <div className="mb-4 flex items-center justify-between gap-2">
               <h2 className="text-lg font-semibold">Estado médico</h2>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeInjuries.length ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>{activeInjuries.length ? `${activeInjuries.length} activa(s)` : "Sin lesiones activas"}</span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${activeInjuries.length ? "bg-status-active text-white" : "bg-status-clear text-white"}`}>{activeInjuries.length ? `${activeInjuries.length} activa(s)` : "Sin lesiones activas"}</span>
             </div>
             {(user?.role === "admin" || user?.role === "usuario") && <LinkButton to={`/lesiones?jugador=${player.id_jugador}`}>Registrar lesión / Ver tablero</LinkButton>}
             <div className="space-y-4">

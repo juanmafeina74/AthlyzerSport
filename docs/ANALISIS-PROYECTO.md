@@ -1,6 +1,6 @@
 # Análisis del Proyecto: AthLyzer Sports Train
 
-Fecha de actualización: 2026-09-23.
+Fecha de actualización: 2026-10-01.
 
 Este documento es la referencia técnica detallada del estado actual. El [README raíz](../README.md) contiene la guía rápida de instalación y uso; este análisis recoge arquitectura, inventario funcional, modelo de datos, decisiones recientes, riesgos y roadmap.
 
@@ -36,10 +36,10 @@ AthLyzer Sports Train es una aplicación web para gestión deportiva con autenti
 - Stepper antropométrico ISAK de cuatro pasos con historial, cálculos reactivos y somatocarta.
 - API antropométrica con auditoría del evaluador y cálculos derivados persistidos en servidor.
 - Throttling global y límite específico para login.
+- Gestión de lesiones y readaptación con registro, mapa anatómico, tablero por fases, cambio de fase y alta médica.
 
 ### No implementado todavía
 
-- CRUD y pantallas para lesiones.
 - Relación de jugador con posición.
 - Cálculo validado de masa muscular con las variables necesarias.
 - Tests automatizados de frontend.
@@ -84,7 +84,7 @@ npm start
 | Jugadores | CRUD, detalle relacional y foto | Listado, CRUD y ficha | Lectura autenticada, mutación `admin` |
 | Jugador-equipo | Asignación individual/en bloque y baja lógica | Dual listbox | Lectura autenticada, mutación `admin` |
 | Antropometría | Crear, historial por jugador y cálculo | Stepper ISAK y somatocarta | `admin`, `usuario` |
-| Lesiones | Solo modelo Prisma | Sin pantalla | Pendiente |
+| Lesiones | Listado, registro y cambio de fase/alta médica | Mapa anatómico y tablero `/lesiones` | `admin`, `usuario` |
 | Posiciones | Solo modelo Prisma, sin FK a jugador | Sin pantalla | Pendiente |
 
 ### Ficha de jugador
@@ -109,6 +109,12 @@ La fotografía no se almacena como `BYTEA` ni como base64 en PostgreSQL. El endp
 - Valor persistido en `jugador.foto`: `/uploads/jugadores/<uuid>.<ext>`.
 
 El directorio está en `.gitignore`. El servicio elimina la foto local anterior cuando se reemplaza o elimina el jugador. Para producción se recomienda sustituir el almacenamiento local por Blob Storage, S3 o CDN y conservar la misma idea de guardar únicamente una URL.
+
+### Lesiones y readaptación
+
+Los roles `admin` y `usuario` pueden consultar y registrar lesiones mediante `GET /api/lesiones` y `POST /api/lesiones`. Cada lesión incluye jugador, fecha de inicio, tipo, zona corporal, observaciones y fase de readaptación.
+
+El endpoint `PATCH /api/lesiones/:id/fase` permite mover una lesión entre las fases 1 a 4. El alta médica solo se permite desde la fase 4 y registra `alta_medica` junto con `fecha_alta_real`. El frontend reúne estas operaciones en `/lesiones`, con mapa anatómico para el registro y tablero de seguimiento por fases.
 
 ### Antropometría ISAK
 
@@ -142,6 +148,7 @@ Rutas relevantes:
 /jugadores/editar/:id
 /jugadores/borrar/:id
 /mediciones-antropometricas/crear
+/lesiones
 /temporadas...
 ```
 
@@ -169,6 +176,7 @@ Migraciones:
 20260914110403_auth_roles_users
 20260916090000_categorias_equipos
 20260922120000_mediciones_antropometricas_isak
+20260930120000_lesion_readaptacion
 ```
 
 ## 6. Decisiones recientes
@@ -211,11 +219,11 @@ Pendiente:
 
 ## 8. Calidad y pruebas
 
-Validación de referencia del 2026-09-23:
+Validación de referencia del 2026-10-01:
 
 ```text
 Backend build: correcto
-Backend test: 25 tests correctos en 8 archivos
+Backend test: 31 tests correctos en 9 archivos
 Backend lint: correcto
 Frontend build: correcto
 ```
@@ -238,7 +246,7 @@ No hay todavía tests automatizados de componentes o flujos del frontend; la rev
 1. No hay CI que ejecute build, tests y lint en cada cambio.
 2. Las URLs de API están hardcodeadas para localhost.
 3. El almacenamiento local de fotografías no es adecuado para varias réplicas del backend.
-4. No hay CRUD de lesiones.
+4. Lesiones dispone de registro, listado y cambio de fase; faltan edición y eliminación.
 5. `posicion` no está relacionada con `jugador`.
 6. La masa muscular no se persiste porque falta una fórmula y variables validadas.
 7. Persisten riesgos de `localStorage`, falta de Helmet y dependencias con rangos `latest` en frontend.
@@ -249,7 +257,7 @@ No hay todavía tests automatizados de componentes o flujos del frontend; la rev
 1. Externalizar configuración de API y fijar versiones frontend.
 2. Añadir CI con backend build/test/lint y frontend build.
 3. Migrar fotografías a almacenamiento de objetos/CDN.
-4. Implementar CRUD y permisos de lesiones.
+4. Completar edición y eliminación de lesiones, con permisos explícitos.
 5. Modelar la relación jugador-posición.
 6. Definir y validar el cálculo de masa muscular con el equipo deportivo.
 7. Añadir tests de integración frontend y flujos Playwright.

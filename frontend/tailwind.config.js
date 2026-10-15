@@ -9,11 +9,11 @@ export default {
 
       colors: {
         brand: {
-          dark: "#1f2937",
+          dark: "var(--color-ink)",
           light: "var(--color-background)",
           primary: "var(--color-primary)",
           secondary: "var(--color-secondary)",
-          accent: "var(--color-secondary)",
+          accent: "var(--color-info)",
         },
 
         panel: {
@@ -32,7 +32,11 @@ export default {
         },
 
         status: {
-          medical: "var(--color-medical)",
+          active: "var(--color-error)",
+          clear: "var(--color-success)",
+          pending: "var(--color-warning)",
+          info: "var(--color-info)",
+          medical: "var(--color-success)",
         },
       },
 

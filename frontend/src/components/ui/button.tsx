@@ -21,6 +21,7 @@ interface ButtonProps {
 }
 
 export function Button({ children, color = "primary", onClick, type = "button" }: ButtonProps) {
+  
   return (
     <button
       type={type}

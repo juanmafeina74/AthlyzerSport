@@ -7,10 +7,10 @@ import BodyMap from "./BodyMap";
 type Player = { id_jugador: number; nombre: string; apellidos: string };
 
 const phases = [
-  { key: "Fase 1", title: "Aguda / Tratamiento", detail: "Camilla", color: "border-rose-400 bg-rose-50" },
-  { key: "Fase 2", title: "Readaptación física", detail: "Gimnasio", color: "border-amber-400 bg-amber-50" },
-  { key: "Fase 3", title: "Campo adaptado", detail: "Trabajo individual", color: "border-sky-400 bg-sky-50" },
-  { key: "Fase 4", title: "Integración parcial", detail: "Con el grupo", color: "border-emerald-400 bg-emerald-50" },
+  { key: "Fase 1", title: "Aguda / Tratamiento", detail: "Camilla", color: "border-status-active bg-red-50" },
+  { key: "Fase 2", title: "Readaptación física", detail: "Gimnasio", color: "border-status-pending bg-amber-50" },
+  { key: "Fase 3", title: "Campo adaptado", detail: "Trabajo individual", color: "border-status-info bg-blue-50" },
+  { key: "Fase 4", title: "Integración parcial", detail: "Con el grupo", color: "border-status-clear bg-green-50" },
 ] as const;
 
 function today() {
@@ -84,12 +84,12 @@ export default function ReathBoard() {
     <div className="mx-auto max-w-[1600px] space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b border-gray-200 pb-5">
         <div>
-          <p className="text-xs font-semibold uppercase text-teal-700">Salud de la plantilla</p>
+          <p className="text-xs font-semibold uppercase text-status-info">Salud de la plantilla</p>
           <h1 className="text-2xl font-bold text-gray-900">Lesiones y readaptación</h1>
           <p className="mt-1 text-sm text-gray-600">{active.length} en seguimiento · {discharged.length} altas registradas</p>
         </div>
         <button type="button" onClick={() => { setShowForm((open) => !open); setError(""); }}
-          className="rounded bg-brand-dark px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800">
+          className="rounded bg-brand-dark px-4 py-2 text-sm font-semibold text-white hover:bg-brand-secondary">
           {showForm ? "Cerrar registro" : "+ Nueva lesión"}
         </button>
       </header>
@@ -120,7 +120,7 @@ export default function ReathBoard() {
               <textarea rows={3} value={form.observaciones} onChange={(event) => setForm({ ...form, observaciones: event.target.value })}
                 className="mt-1 block w-full rounded border border-gray-300 p-2 focus:outline-teal-700" />
             </label>
-            <button type="submit" disabled={saving || !form.zona_corporal} className="self-end rounded bg-teal-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-start">
+            <button type="submit" disabled={saving || !form.zona_corporal} className="self-end rounded bg-brand-primary px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2 sm:justify-self-start">
               {saving ? "Guardando..." : "Registrar lesión"}
             </button>
           </div>
