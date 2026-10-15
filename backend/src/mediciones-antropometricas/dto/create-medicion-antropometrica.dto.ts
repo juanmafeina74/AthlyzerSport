@@ -1,9 +1,23 @@
-import { IsISO8601, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { ProtocoloAntropometrico } from '@prisma/client';
+import { IsEnum, IsISO8601, IsInt, IsNumber, IsOptional, IsString, Min, ValidateIf } from 'class-validator';
 
 export class CreateMedicionAntropometricaDto {
   @IsInt()
   @Min(1)
   id_jugador!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  id_equipo?: number | null;
+
+  @IsEnum(ProtocoloAntropometrico)
+  protocolo!: ProtocoloAntropometrico;
+
+  @ValidateIf((data: CreateMedicionAntropometricaDto) => data.id_equipo != null || data.version_protocolo_antropometrico !== undefined)
+  @IsInt()
+  @Min(1)
+  version_protocolo_antropometrico?: number;
 
   @IsOptional()
   @IsISO8601({}, { message: 'La fecha debe tener formato ISO válido.' })
@@ -22,29 +36,35 @@ export class CreateMedicionAntropometricaDto {
   @Min(0.1)
   talla_sentado_cm?: number;
 
+  @ValidateIf((data: CreateMedicionAntropometricaDto, value: unknown) => data.protocolo === ProtocoloAntropometrico.ISAK || value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.1)
-  pliegue_tricipital!: number;
+  pliegue_tricipital?: number;
 
+  @ValidateIf((data: CreateMedicionAntropometricaDto, value: unknown) => data.protocolo === ProtocoloAntropometrico.ISAK || value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.1)
-  pliegue_subescapular!: number;
+  pliegue_subescapular?: number;
 
+  @ValidateIf((data: CreateMedicionAntropometricaDto, value: unknown) => data.protocolo === ProtocoloAntropometrico.ISAK || value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.1)
-  pliegue_supraespinal!: number;
+  pliegue_supraespinal?: number;
 
+  @ValidateIf((data: CreateMedicionAntropometricaDto, value: unknown) => data.protocolo === ProtocoloAntropometrico.ISAK || value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.1)
-  pliegue_abdominal!: number;
+  pliegue_abdominal?: number;
 
+  @ValidateIf((data: CreateMedicionAntropometricaDto, value: unknown) => data.protocolo === ProtocoloAntropometrico.ISAK || value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.1)
-  pliegue_muslo!: number;
+  pliegue_muslo?: number;
 
+  @ValidateIf((data: CreateMedicionAntropometricaDto, value: unknown) => data.protocolo === ProtocoloAntropometrico.ISAK || value !== undefined)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.1)
-  pliegue_pantorrilla!: number;
+  pliegue_pantorrilla?: number;
 
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })

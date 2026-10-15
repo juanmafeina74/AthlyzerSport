@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   ParseIntPipe,
   Post,
   Query,
@@ -15,6 +16,7 @@ import { RolesGuard } from '../auth/roles.guard.js';
 import { JugadorEquipoService } from './jugador-equipo.service.js';
 import { AssignJugadorDto } from './dto/assign-jugador.dto.js';
 import { BulkJugadoresDto } from './dto/bulk-jugadores.dto.js';
+import { UpdateJugadorEquipoPosicionDto } from './dto/update-jugador-equipo-posicion.dto.js';
 
 @Controller('equipos/:idEquipo/plantilla')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,7 +39,17 @@ export class JugadorEquipoController {
   @Post()
   @Roles('admin')
   assign(@Param('idEquipo', ParseIntPipe) idEquipo: number, @Body() data: AssignJugadorDto) {
-    return this.jugadorEquipoService.assign(idEquipo, data.id_jugador, data.dorsal);
+    return this.jugadorEquipoService.assign(idEquipo, data.id_jugador, data.dorsal, data.id_posicion);
+  }
+
+  @Patch(':idJugador/posicion')
+  @Roles('admin')
+  updatePosition(
+    @Param('idEquipo', ParseIntPipe) idEquipo: number,
+    @Param('idJugador', ParseIntPipe) idJugador: number,
+    @Body() data: UpdateJugadorEquipoPosicionDto,
+  ) {
+    return this.jugadorEquipoService.updatePosition(idEquipo, idJugador, data.id_posicion);
   }
 
   @Post('bulk-assign')

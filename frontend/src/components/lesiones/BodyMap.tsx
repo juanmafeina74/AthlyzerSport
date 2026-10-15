@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Button from "../ui/button";
 
 type Region = { name: string; path: string; side?: boolean };
 
@@ -35,8 +36,8 @@ export default function BodyMap({ value, onChange }: { value: string; onChange: 
         <span className="text-sm font-semibold text-gray-800">Zona anatómica *</span>
         <div className="inline-flex rounded border border-gray-300 bg-white p-0.5 text-xs" aria-label="Vista del cuerpo">
           {(["Anterior", "Posterior"] as const).map((option) => (
-            <button key={option} type="button" onClick={() => setView(option)} aria-pressed={view === option}
-              className={`rounded px-3 py-1.5 ${view === option ? "bg-brand-dark text-white" : "text-gray-600 hover:bg-gray-100"}`}>{option}</button>
+            <Button key={option} unstyled type="button" onClick={() => setView(option)} aria-pressed={view === option}
+              className={`rounded px-3 py-1.5 ${view === option ? "bg-brand-dark text-white" : "text-gray-600 hover:bg-gray-100"}`}>{option}</Button>
           ))}
         </div>
       </div>

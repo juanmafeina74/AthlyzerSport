@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -24,12 +24,14 @@ export class JugadoresService {
       include: {
         jugador_equipo: {
           include: {
+            posicion: true,
             equipo: {
               include: { categoria: true, temporada: true },
             },
           },
           orderBy: { fecha_inicio: 'desc' },
         },
+        posicion_preferida: true,
         lesion: { orderBy: { fecha_inicio: 'desc' } },
         medicion_antropometrica: {
           include: { evaluador: { select: { id_usuario: true, nombre: true } } },
@@ -45,6 +47,10 @@ export class JugadoresService {
   }
 
   async create(data: CreateJugadorDto) {
+    if (data.id_posicion_preferida != null) {
+      await this.ensurePositionExists(data.id_posicion_preferida);
+    }
+
     return this.prisma.jugador.create({
       data: {
         dni: data.dni,
@@ -52,12 +58,18 @@ export class JugadoresService {
         apellidos: data.apellidos,
         fecha_nacimiento: new Date(data.fecha_nacimiento),
         foto: data.foto ?? null,
+        id_posicion_preferida: data.id_posicion_preferida ?? null,
       },
+      include: { posicion_preferida: true },
     });
   }
 
   async update(id: number, data: UpdateJugadorDto) {
     await this.findOne(id);
+
+    if (data.id_posicion_preferida != null) {
+      await this.ensurePositionExists(data.id_posicion_preferida);
+    }
 
     return this.prisma.jugador.update({
       where: { id_jugador: id },
@@ -69,8 +81,17 @@ export class JugadoresService {
           ? new Date(data.fecha_nacimiento)
           : undefined,
         foto: data.foto,
+        id_posicion_preferida: data.id_posicion_preferida,
       },
+      include: { posicion_preferida: true },
     });
+  }
+
+  private async ensurePositionExists(idPosicion: number) {
+    const position = await this.prisma.posicion.findUnique({ where: { id_posicion: idPosicion } });
+    if (!position) {
+      throw new BadRequestException(`La posición ${idPosicion} no existe.`);
+    }
   }
 
   async updatePhoto(id: number, file: UploadedPhoto) {

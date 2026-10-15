@@ -4,6 +4,7 @@ import { JugadorEquipoService } from './jugador-equipo.service.js';
 function createService() {
   const prisma = {
     equipo: { findUnique: vi.fn() },
+    posicion: { findUnique: vi.fn() },
     jugador: { findMany: vi.fn(), findUnique: vi.fn() },
     jugador_equipo: {
       findMany: vi.fn(),
@@ -48,6 +49,7 @@ describe('JugadorEquipoService', () => {
       id_jugador_equipo: 10,
       activo: false,
       dorsal: 7,
+      id_posicion: 2,
     });
     prisma.jugador_equipo.update.mockResolvedValue({ id_jugador_equipo: 10, activo: true });
 
@@ -89,5 +91,54 @@ describe('JugadorEquipoService', () => {
         data: expect.objectContaining({ activo: false }),
       }),
     );
+  });
+
+  it('devuelve en la plantilla la posición del equipo y la preferida del jugador', async () => {
+    const { service, prisma } = createService();
+    prisma.equipo.findUnique.mockResolvedValue({ id_equipo: 1 });
+    prisma.jugador_equipo.findMany.mockResolvedValue([{
+      id_jugador_equipo: 10,
+      id_jugador: 5,
+      dorsal: 7,
+      fecha_inicio: new Date('2026-09-01'),
+      jugador: { id_jugador: 5, posicion_preferida: { id_posicion: 1, nombre: 'Defensa' } },
+      posicion: { id_posicion: 2, nombre: 'Portero' },
+    }]);
+
+    const roster = await service.findPlantilla(1);
+
+    expect(roster[0]).toMatchObject({
+      posicion: { id_posicion: 2, nombre: 'Portero' },
+      jugador: { posicion_preferida: { id_posicion: 1, nombre: 'Defensa' } },
+    });
+  });
+
+  it('actualiza o limpia la posición de una pertenencia activa', async () => {
+    const { service, prisma } = createService();
+    prisma.equipo.findUnique.mockResolvedValue({ id_equipo: 1 });
+    prisma.posicion.findUnique.mockResolvedValue({ id_posicion: 3, nombre: 'Delantero' });
+    prisma.jugador_equipo.findFirst.mockResolvedValue({ id_jugador_equipo: 10 });
+    prisma.jugador_equipo.update.mockResolvedValue({ id_jugador_equipo: 10, id_posicion: 3 });
+
+    await service.updatePosition(1, 5, 3);
+    expect(prisma.jugador_equipo.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id_jugador_equipo: 10 },
+      data: { id_posicion: 3 },
+      include: { posicion: true },
+    }));
+
+    await service.updatePosition(1, 5, null);
+    expect(prisma.jugador_equipo.update).toHaveBeenLastCalledWith(expect.objectContaining({
+      data: { id_posicion: null },
+    }));
+  });
+
+  it('rechaza asignar una posición inexistente a la plantilla', async () => {
+    const { service, prisma } = createService();
+    prisma.equipo.findUnique.mockResolvedValue({ id_equipo: 1 });
+    prisma.posicion.findUnique.mockResolvedValue(null);
+
+    await expect(service.updatePosition(1, 5, 99)).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.jugador_equipo.update).not.toHaveBeenCalled();
   });
 });

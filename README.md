@@ -1,6 +1,6 @@
 # AthLyzer Sports Train
 
-Documentacion de estado del proyecto a fecha 2026-10-01. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
+Documentacion de estado del proyecto a fecha 2026-10-08. El objetivo de este documento es que cualquier persona del equipo pueda entender que tenemos construido, como se arranca, como esta organizada la aplicacion y que puntos quedan pendientes.
 
 > Para un analisis tecnico mas detallado (arquitectura, inventario funcional modulo a modulo, riesgos priorizados y roadmap), ver [docs/ANALISIS-PROYECTO.md](docs/ANALISIS-PROYECTO.md).
 
@@ -22,8 +22,8 @@ Estado actual:
 - Gestion de plantillas de equipo (asignar/quitar jugadores) mediante una pantalla de tipo "dual listbox" (jugadores disponibles vs. plantilla del equipo), con soporte de selección multiple y acciones en bloque.
 - Ficha ampliada de jugador en `/jugadores/:id`, con acceso por doble clic sobre la card, teclado o boton visible.
 - Subida de fotografia de jugador para administradores; el archivo se almacena fuera de PostgreSQL y la BD conserva solo su ruta publica.
-- Flujo antropometrico ISAK en un stepper de cuatro pasos, con historial previo, calculos reactivos, somatocarta, persistencia y auditoria del evaluador.
-- Gestion de lesiones y readaptacion con registro, mapa anatomico, tablero por fases, cambio de fase y alta medica.
+- Captura antropométrica BASICA o ISAK según la modalidad configurada por equipo, con historial, cálculos ISAK en backend y auditoría del evaluador.
+- Seguimiento de lesiones y readaptación: registro con mapa corporal, tablero por fases, altas médicas y resumen de plantilla.
 - Tests de integracion (e2e) que cubren JWT/roles y rate limiting en endpoints protegidos: sin token, token invalido, rol no admin, rol admin y bloqueo por exceso de intentos de login, extendidos a equipos, jugadores, categorias, usuarios, temporadas y a los distintos casos de negocio de `auth.login`.
 - Frontend con rutas privadas: si no hay usuario logado con token, redirige a `/login`.
 - UI unificada alrededor de componentes `Card`, `Button`, `LinkButton`, `FormInput`, `FormSelect` y `FormTextarea`.
@@ -341,14 +341,22 @@ POST   /api/equipos/:idEquipo/plantilla                 admin  # asigna un jugad
 POST   /api/equipos/:idEquipo/plantilla/bulk-assign     admin  # asigna varios { id_jugadores: number[] }
 POST   /api/equipos/:idEquipo/plantilla/bulk-remove     admin  # quita varios { id_jugadores: number[] }
 DELETE /api/equipos/:idEquipo/plantilla/:idJugador      admin  # quita un jugador
+PATCH  /api/equipos/:idEquipo/plantilla/:idJugador/posicion admin  # asigna o limpia la posición del jugador en el equipo
 
 GET    /api/mediciones-antropometricas/jugador/:idJugador  admin, usuario
 POST   /api/mediciones-antropometricas                       admin, usuario
 
-GET    /api/lesiones                              admin, usuario
-POST   /api/lesiones                              admin, usuario
-PATCH  /api/lesiones/:id/fase                    admin, usuario
+GET    /api/lesiones                    admin, usuario
+POST   /api/lesiones                    admin, usuario
+PATCH  /api/lesiones/:id/fase           admin, usuario
+
+GET    /api/posiciones                  cualquier usuario autenticado
+POST   /api/posiciones                  admin
+PUT    /api/posiciones/:id              admin
+DELETE /api/posiciones/:id              admin
 ```
+
+Los equipos exponen `protocolo_antropometrico` y `version_protocolo_antropometrico`. Solo `admin` puede configurar la modalidad. Los equipos existentes se migraron como ISAK y los nuevos usan BASICA por defecto. Con pertenencias activas se selecciona explícitamente el equipo; sin ellas se elige el protocolo y el registro queda sin equipo. El historial conserva el protocolo y el equipo de origen.
 
 ## Validacion de Datos (DTOs)
 
@@ -393,11 +401,11 @@ Modelos definidos actualmente:
 - `categoria`: categorías deportivas con identificador, nombre único y estado activo.
 - `temporada`: temporadas deportivas.
 - `equipo`: equipos asociados a una temporada y, opcionalmente, a una categoría mediante `id_categoria`.
-- `jugador`: jugadores con DNI, nombre, apellidos, fecha de nacimiento y foto.
-- `jugador_equipo`: relacion jugador-equipo con fechas, dorsal y estado activo.
-- `lesion`: lesiones de jugadores.
-- `medicion_antropometrica`: protocolo ISAK completo, resultados calculados, somatotipo, somatocarta, observaciones, evaluador y marcas de auditoria.
-- `posicion`: posiciones deportivas.
+- `jugador`: jugadores con DNI, nombre, apellidos, fecha de nacimiento, foto y posición preferida opcional.
+- `jugador_equipo`: relación histórica jugador-equipo con fechas, dorsal, posición principal opcional y estado activo.
+- `lesion`: jugador, fecha de inicio y fin, tipo, zona corporal, gravedad, fase de readaptación, alta médica, observaciones y fecha de alta real.
+- `medicion_antropometrica`: modalidades BASICA/ISAK, medidas comunes, resultados derivados nullable según modalidad, equipo de origen opcional, evaluador y marcas de auditoria.
+- `posicion`: catálogo para la preferencia del jugador y la posición principal en cada pertenencia.
 
 Migraciones Prisma existentes:
 
@@ -409,6 +417,8 @@ backend/prisma/migrations/
 	20260916090000_categorias_equipos/
 	20260922120000_mediciones_antropometricas_isak/
 	20260930120000_lesion_readaptacion/
+	20261006160000_protocolos_antropometricos/
+	20261008120000_player_positions/
 ```
 
 ## Frontend
@@ -449,6 +459,7 @@ frontend/src/
 		equipos/
 		jugadores/
 		mediciones-antropometricas/
+		lesiones/
 		temporadas/
 ```
 
@@ -476,6 +487,7 @@ Rutas actuales:
 /categorias/crear
 /categorias/editar/:id
 /categorias/borrar/:id
+/posiciones
 /usuarios
 /usuarios/crear
 /usuarios/editar/:id
@@ -506,8 +518,9 @@ Los servicios estan en `frontend/src/components/services/`.
 - `usuarios.service.ts`: llamadas a `/api/usuarios` y `/api/usuarios/roles`.
 - `equipos.service.ts`: llamadas a `/api/equipos`.
 - `jugadores.service.ts`: llamadas a `/api/jugadores`, detalle ampliado y subida de foto.
-- `medicionesAntropometricas.service.ts`: historial y creación de mediciones ISAK.
-- `lesiones.service.ts`: listado, registro y cambio de fase de lesiones.
+- `posiciones.service.ts`: catálogo CRUD disponible para la selección de posiciones.
+- `medicionesAntropometricas.service.ts`: historial y creación de mediciones BASICA/ISAK.
+- `lesiones.service.ts`: listado, alta y actualización de fase de lesiones.
 - `temporadas.service.ts`: llamadas a `/api/temporadas`.
 
 Los servicios CRUD adjuntan `Authorization: Bearer ...` usando el token guardado en `localStorage`.
@@ -550,12 +563,12 @@ Pantallas ya alineadas con este sistema:
 - Ficha ampliada de jugador con doble clic, teclado o boton visible.
 - Subida de foto desde la ficha para administradores; JPEG, PNG y WebP hasta 5 MB.
 - Crear, editar y borrar temporadas.
-- Stepper antropometrico de cuatro pasos: contexto, pliegues, perimetros/diametros y revision final.
-- Registro y readaptacion de lesiones: mapa anatomico, tablero de cuatro fases, cambio de fase y altas medicas.
+- Captura BASICA en dos pasos (contexto y medidas básicas) o ISAK en cuatro pasos; el formulario elige los campos y resultados según equipo y modalidad.
+- Tablero de lesiones y readaptación con cuatro fases, alta médica y mapa corporal anterior/posterior.
 
 ## Validacion Ejecutada
 
-Validaciones que han pasado en el estado actual del proyecto:
+Validaciones ejecutadas durante la revisión del 2026-10-06:
 
 ```bash
 cd backend
@@ -570,11 +583,12 @@ npm run build
 Resultado conocido:
 
 - Backend build: correcto.
-- Backend tests: correcto, 31 tests pasan en 9 archivos, incluyendo calculos ISAK, auditoria del evaluador, detalle ampliado de jugador y lesiones.
+- Backend tests: correcto, 53 tests pasan en 10 archivos, incluyendo protocolos BASICA/ISAK, cálculos, pertenencias y configuración de equipos.
 - Backend lint: correcto.
 - Frontend build: correcto.
+- Backend e2e protegido: correcto, 51 tests pasan con Prisma mock; no requieren PostgreSQL.
 
-Ademas, `backend/test/protected-endpoints.e2e-spec.ts` anade 30 tests de integracion organizados en 5 bloques independientes (equipos/usuarios, casos de negocio de `auth.login`, categorias, jugadores y temporadas), cada uno con su propia instancia de la app y un `PrismaService` mockeado, por lo que no requieren una base de datos real. Cubren JWT/roles (401/403), validacion de DTOs (400), rate limiting en login (429) y los casos de negocio de login: usuario inexistente (404), usuario inactivo (400) y password incorrecta (400). El e2e historico `backend/test/app.e2e-spec.ts` si necesita una PostgreSQL real conectada via `DATABASE_URL` para pasar.
+La prueba específica `backend/test/protocolos-antropometricos-migration.e2e-spec.ts` verifica la migración en un esquema PostgreSQL aislado; requiere `DATABASE_URL` y activación explícita con `TEST_PROTOCOL_MIGRATION=1`. No se ejecutó en la revisión indicada. No hay tests automatizados de frontend.
 
 ## Gestion de Usuarios
 
@@ -632,7 +646,7 @@ A nivel de datos, "mover" un jugador no lo borra fisicamente: la tabla `jugador_
 
 Endpoints usados (ver sección "Autorizacion de Endpoints"): lectura disponible para cualquier rol autenticado; asignar/quitar (individual o en bloque) requiere rol `admin`.
 
-Limitacion conocida: el filtro de disponibles solo es por texto (nombre/apellidos/DNI); el esquema actual no vincula `jugador` con `categoria` ni con `posicion`, por lo que no es posible filtrar por esos campos sin ampliar el modelo de datos.
+Limitación conocida: el filtro de jugadores disponibles solo es por texto (nombre/apellidos/DNI); no existe relación jugador-categoría.
 
 Aviso no bloqueante observado: Vitest muestra una recomendacion relacionada con `vite-tsconfig-paths`, indicando que Vite ya soporta resolucion nativa de paths mediante `resolve.tsconfigPaths`.
 
@@ -642,11 +656,14 @@ Desde `/jugadores`, una card se puede abrir con doble clic, con la tecla `Enter`
 
 - Datos personales, DNI, fecha de nacimiento, edad y estado deportivo.
 - Equipo o equipos activos, dorsal, categoría y temporada.
+- Posición preferida del jugador y posición asignada en cada pertenencia.
 - Histórico de equipos con fechas de pertenencia.
 - Última medición antropométrica y hasta cuatro mediciones anteriores.
 - Lesiones registradas y número de lesiones activas.
 
 El endpoint `GET /api/jugadores/:id` carga estas relaciones en una sola consulta Prisma, ordena equipos y lesiones por fecha y limita a cinco las mediciones más recientes.
+
+La posición preferida se edita en el alta/edición del jugador y aparece en su ficha. La plantilla de cada equipo muestra esa preferencia y permite a `admin` asignar una posición principal distinta para esa pertenencia. El catálogo se crea y mantiene desde `/posiciones`, disponible para `admin`.
 
 ### Fotografías
 
@@ -660,16 +677,33 @@ La columna `jugador.foto` almacena una URL o ruta, no el binario de la imagen. L
 
 En producción, el mismo contrato puede conectarse a almacenamiento de objetos o CDN guardando en `jugador.foto` únicamente la URL resultante.
 
-## Mediciones Antropométricas ISAK
+## Lesiones y Readaptación
 
-La ruta `/mediciones-antropometricas/crear` está disponible para roles `admin` y `usuario`. El formulario se organiza en cuatro pasos:
+Los roles `admin` y `usuario` pueden consultar y registrar lesiones, y cambiar su fase de readaptación. La API expone:
 
-1. Contexto y datos básicos: jugador, fecha, peso, talla y talla sentado; muestra IMC, último peso y variación.
-2. Pliegues cutáneos: seis campos obligatorios y dos opcionales; actualiza sumatorias y porcentaje de grasa mientras se escribe y avisa valores superiores a 35 mm.
-3. Perímetros y diámetros: medidas ISAK opcionales y observaciones.
-4. Revisión: composición corporal, somatotipo Heath-Carter y somatocarta con comparación contra la medición anterior.
+```text
+GET    /api/lesiones
+POST   /api/lesiones
+PATCH  /api/lesiones/:id/fase
+```
 
-El frontend envía las medidas brutas. El backend calcula y persiste las sumatorias, porcentaje de grasa y somatotipo; `id_evaluador` se toma del JWT y no del body recibido. La masa muscular permanece sin calcular mientras el modelo no disponga de una fórmula validada y de las variables requeridas.
+El registro requiere jugador, fecha de inicio, tipo de lesión y zona corporal; las observaciones son opcionales. Cada lesión nueva empieza en `Fase 1`. Se pueden asignar las fases `Fase 1` a `Fase 4`; el alta médica solo se permite desde `Fase 4` y es irreversible desde la API. No hay endpoints para editar el resto de los datos ni eliminar lesiones.
+
+La pantalla `/lesiones` ofrece un mapa corporal con vistas anterior y posterior para seleccionar la zona, columnas para las cuatro fases y cambio de fase mediante selector o arrastre. Las lesiones dadas de alta aparecen en una sección separada. El dashboard resume las lesiones activas de la plantilla del equipo seleccionado y ofrece el acceso al registro. La ficha `/jugadores/:id` muestra el estado de lesiones activas y hasta cuatro registros.
+
+**Alcance de acceso:** `GET /api/lesiones` devuelve el listado global, incluyendo datos del jugador, a cualquier usuario con rol `admin` o `usuario`; la API no filtra por equipo. El dashboard filtra localmente según la plantilla seleccionada, pero eso no restringe las respuestas del backend. La aplicación tampoco tiene aislamiento por club o tenant, por lo que debe considerarse una limitación de privacidad pendiente.
+
+## Mediciones Antropométricas BASICA e ISAK
+
+La ruta `/mediciones-antropometricas/crear` está disponible para roles `admin` y `usuario`. El formulario carga las pertenencias del jugador. Si tiene equipos activos, la persona evaluadora selecciona el equipo y se aplica su modalidad; no se elige automáticamente entre equipos. Si no tiene pertenencias activas, se puede seleccionar una modalidad y registrar sin equipo. La fecha debe ser compatible con el período de pertenencia.
+
+**BASICA** usa dos pasos: contexto (jugador, fecha, peso y talla) y medidas básicas (cintura y observaciones opcionales). No calcula grasa, músculo, sumatorias ni somatotipo. El frontend muestra IMC como referencia, no como diagnóstico.
+
+**ISAK** conserva cuatro pasos: contexto, pliegues (seis obligatorios y dos opcionales), perímetros/diámetros y revisión con composición corporal, somatotipo Heath-Carter y somatocarta cuando hay datos suficientes. El backend calcula los resultados; la masa muscular permanece sin calcular al no existir fórmula validada y variables suficientes.
+
+La modalidad se configura en la edición de equipo y solo `admin` puede cambiarla. Los equipos nuevos usan BASICA por defecto; los existentes se inicializaron como ISAK. La versión de configuración detecta cambios ocurridos durante una captura y permite responder con conflicto para recargar el contexto. Cada medición guarda el protocolo y equipo de origen, de modo que reconfigurar un equipo no altera el historial. Las mediciones previas se conservan como ISAK sin atribuirles equipo ni recalcularlas.
+
+El evaluador se toma del JWT y nunca del body. Para los detalles de DTO, rutas, validaciones y códigos de error, consultar [backend/README.md](backend/README.md).
 
 ## Problemas Resueltos Recientemente
 

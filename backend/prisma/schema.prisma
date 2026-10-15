@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProtocoloAntropometrico {
+  BASICA
+  ISAK
+}
+
 model rol {
   id_rol   Int      @id @default(autoincrement())
   nombre   String   @unique @db.VarChar(50)
@@ -30,9 +35,12 @@ model equipo {
   id_categoria   Int?
   nombre         String           @db.VarChar(100)
   fecha_creacion DateTime         @db.Date
-  temporada      temporada        @relation(fields: [id_temporada], references: [id_temporada], onDelete: Cascade)
+  protocolo_antropometrico ProtocoloAntropometrico @default(BASICA)
+  version_protocolo_antropometrico Int @default(1)
+  temporada      temporada        @relation(fields: [id_temporada], references: [id_temporada], onDelete: Restrict)
   categoria      categoria?       @relation(fields: [id_categoria], references: [id_categoria], onDelete: Restrict)
   jugador_equipo jugador_equipo[]
+  mediciones_antropometricas medicion_antropometrica[]
 
   @@index([id_categoria], map: "idx_equipo_categoria")
   @@index([id_temporada], map: "idx_equipo_temporada")
@@ -52,6 +60,8 @@ model jugador {
   apellidos               String                    @db.VarChar(150)
   fecha_nacimiento        DateTime                  @db.Date
   foto                    String?
+  id_posicion_preferida   Int?
+  posicion_preferida      posicion?                 @relation("PosicionPreferida", fields: [id_posicion_preferida], references: [id_posicion], onDelete: Restrict)
   jugador_equipo          jugador_equipo[]
   lesion                  lesion[]
   medicion_antropometrica medicion_antropometrica[]
@@ -63,12 +73,14 @@ model jugador_equipo {
   id_jugador_equipo Int       @id @default(autoincrement())
   id_jugador        Int
   id_equipo         Int
+  id_posicion       Int?
   fecha_inicio      DateTime  @db.Date
   fecha_fin         DateTime? @db.Date
   dorsal            Int?
   activo            Boolean   @default(true)
   equipo            equipo    @relation(fields: [id_equipo], references: [id_equipo], onDelete: Cascade)
   jugador           jugador   @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
+  posicion          posicion? @relation(fields: [id_posicion], references: [id_posicion], onDelete: Restrict)
 
   @@index([activo], map: "idx_jugador_equipo_activo")
   @@index([id_equipo], map: "idx_jugador_equipo_equipo")
@@ -97,16 +109,18 @@ model medicion_antropometrica {
   id_medicion                    Int      @id @default(autoincrement())
   id_jugador                     Int
   id_evaluador                   Int
+  id_equipo                      Int?
+  protocolo                      ProtocoloAntropometrico
   fecha                          DateTime @default(now())
   peso_kg                        Float
   talla_cm                       Float
   talla_sentado_cm               Float?
-  pliegue_tricipital             Float
-  pliegue_subescapular           Float
-  pliegue_supraespinal           Float
-  pliegue_abdominal              Float
-  pliegue_muslo                  Float
-  pliegue_pantorrilla            Float
+  pliegue_tricipital             Float?
+  pliegue_subescapular           Float?
+  pliegue_supraespinal           Float?
+  pliegue_abdominal              Float?
+  pliegue_muslo                  Float?
+  pliegue_pantorrilla            Float?
   pliegue_bicipital              Float?
   pliegue_cresta_iliaca          Float?
   perimetro_brazo_relajado       Float?
@@ -132,8 +146,10 @@ model medicion_antropometrica {
   updated_at                     DateTime @updatedAt
   jugador                        jugador  @relation(fields: [id_jugador], references: [id_jugador], onDelete: Cascade)
   evaluador                      usuario  @relation(fields: [id_evaluador], references: [id_usuario])
+  equipo                         equipo?  @relation(fields: [id_equipo], references: [id_equipo], onDelete: Restrict)
 
   @@index([fecha], map: "idx_medicion_fecha")
+  @@index([id_equipo], map: "idx_medicion_equipo")
   @@index([id_evaluador], map: "idx_medicion_evaluador")
   @@index([id_jugador], map: "idx_medicion_jugador")
   @@map("medicion_antropometrica")
@@ -143,6 +159,8 @@ model posicion {
   id_posicion Int     @id @default(autoincrement())
   nombre      String  @db.VarChar(100)
   abreviatura String? @db.VarChar(10)
+  jugadores_preferencia jugador[] @relation("PosicionPreferida")
+  jugador_equipo        jugador_equipo[]
 }
 
 model temporada {

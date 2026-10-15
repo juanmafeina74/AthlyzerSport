@@ -9,4 +9,9 @@ export class AssignJugadorDto {
   @IsInt()
   @IsPositive()
   dorsal?: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsPositive()
+  id_posicion?: number | null;
 }

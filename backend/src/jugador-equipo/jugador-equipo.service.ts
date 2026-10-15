@@ -13,6 +13,13 @@ export class JugadorEquipoService {
     }
   }
 
+  private async ensurePositionExists(idPosicion: number) {
+    const position = await this.prisma.posicion.findUnique({ where: { id_posicion: idPosicion } });
+    if (!position) {
+      throw new BadRequestException(`La posición ${idPosicion} no existe.`);
+    }
+  }
+
   async findDisponibles(idEquipo: number, search?: string) {
     await this.ensureEquipoExists(idEquipo);
 
@@ -40,7 +47,7 @@ export class JugadorEquipoService {
 
     const jugadorEquipo = await this.prisma.jugador_equipo.findMany({
       where: { id_equipo: idEquipo, activo: true },
-      include: { jugador: true },
+      include: { jugador: { include: { posicion_preferida: true } }, posicion: true },
       orderBy: [{ dorsal: 'asc' }],
     });
 
@@ -48,13 +55,18 @@ export class JugadorEquipoService {
       id_jugador_equipo: je.id_jugador_equipo,
       id_jugador: je.id_jugador,
       dorsal: je.dorsal,
+      posicion: je.posicion,
       fecha_inicio: je.fecha_inicio,
       jugador: je.jugador,
     }));
   }
 
-  async assign(idEquipo: number, idJugador: number, dorsal?: number) {
+  async assign(idEquipo: number, idJugador: number, dorsal?: number, idPosicion?: number | null) {
     await this.ensureEquipoExists(idEquipo);
+
+    if (idPosicion != null) {
+      await this.ensurePositionExists(idPosicion);
+    }
 
     const jugador = await this.prisma.jugador.findUnique({ where: { id_jugador: idJugador } });
 
@@ -68,12 +80,29 @@ export class JugadorEquipoService {
 
     if (existente) {
       if (existente.activo) {
-        return existente;
+        if (dorsal === undefined && idPosicion === undefined) {
+          return existente;
+        }
+        return this.prisma.jugador_equipo.update({
+          where: { id_jugador_equipo: existente.id_jugador_equipo },
+          data: {
+            dorsal,
+            ...(idPosicion !== undefined ? { id_posicion: idPosicion } : {}),
+          },
+          include: { posicion: true },
+        });
       }
 
       return this.prisma.jugador_equipo.update({
         where: { id_jugador_equipo: existente.id_jugador_equipo },
-        data: { activo: true, fecha_inicio: new Date(), fecha_fin: null, dorsal: dorsal ?? existente.dorsal },
+        data: {
+          activo: true,
+          fecha_inicio: new Date(),
+          fecha_fin: null,
+          dorsal: dorsal ?? existente.dorsal,
+          id_posicion: idPosicion !== undefined ? idPosicion : existente.id_posicion,
+        },
+        include: { posicion: true },
       });
     }
 
@@ -81,10 +110,31 @@ export class JugadorEquipoService {
       data: {
         id_equipo: idEquipo,
         id_jugador: idJugador,
+        id_posicion: idPosicion ?? null,
         fecha_inicio: new Date(),
         dorsal: dorsal ?? null,
         activo: true,
       },
+    });
+  }
+
+  async updatePosition(idEquipo: number, idJugador: number, idPosicion: number | null) {
+    await this.ensureEquipoExists(idEquipo);
+    if (idPosicion != null) {
+      await this.ensurePositionExists(idPosicion);
+    }
+
+    const membership = await this.prisma.jugador_equipo.findFirst({
+      where: { id_equipo: idEquipo, id_jugador: idJugador, activo: true },
+    });
+    if (!membership) {
+      throw new NotFoundException(`El jugador ${idJugador} no está activo en el equipo ${idEquipo}.`);
+    }
+
+    return this.prisma.jugador_equipo.update({
+      where: { id_jugador_equipo: membership.id_jugador_equipo },
+      data: { id_posicion: idPosicion },
+      include: { posicion: true },
     });
   }
 
